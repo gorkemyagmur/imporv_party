@@ -70,7 +70,6 @@ function randomId(prefix) {
 // Generate round plan ensuring equal distribution
 function generateRoundPlan(players, maxRoundsPerPlayer) {
   const playerIds = players.map((p) => p.id);
-  const totalPlayers = playerIds.length;
   
   // Create a pool of player appearances needed
   const playerAppearances = {};

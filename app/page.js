@@ -162,8 +162,6 @@ function HomeContent() {
           status: "pending",
         });
         
-        console.log("Pending request created successfully for user:", user.uid);
-        
         setJoinError("");
         setJoinName("");
         setJoinCode("");
@@ -226,10 +224,6 @@ function HomeContent() {
               <p className="mt-2 text-xs text-amber-200">{createError}</p>
             )}
           </div>
-          <button
-            disabled
-            className="hidden"
-          />
           <div className="rounded-2xl bg-white/5 p-4 text-left">
             <p className="text-xs uppercase tracking-[0.3em] text-purple-200">
               Have a code?

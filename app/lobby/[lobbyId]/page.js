@@ -119,7 +119,7 @@ export default function LobbyPage() {
       setPlayers(playersList);
     });
     return () => unsubscribe();
-  }, [lobbyId, currentUser, router, lobby, wasInLobby]);
+  }, [lobbyId, currentUser, wasInLobby]);
 
   // Listen to pending requests (only for host)
   useEffect(() => {
@@ -319,19 +319,10 @@ export default function LobbyPage() {
     // Check if round is active (not in results or idle state)
     const isRoundActive = lobby?.status === "countdown" || lobby?.status === "rating";
     if (!userIsHost || players.length < 2 || isRoundActive || !lobbyId || !currentUser) {
-      console.log("Cannot start round:", {
-        userIsHost,
-        playersCount: players.length,
-        isRoundActive,
-        lobbyStatus: lobby?.status,
-        lobbyId,
-        currentUser: !!currentUser,
-      });
       return;
     }
 
     try {
-      console.log("Starting round with:", { lobbyId, duration, userId: currentUser.uid });
       const response = await fetch(`/api/lobbies/${lobbyId}/rounds`, {
         method: "POST",
         headers: {
@@ -350,8 +341,6 @@ export default function LobbyPage() {
         return;
       }
 
-      const result = await response.json();
-      console.log("Round started successfully:", result);
       // Round will be created by API, real-time listener will pick it up
       setRatings({});
     } catch (err) {
@@ -886,9 +875,7 @@ export default function LobbyPage() {
         onClose={() => setShowGameCompleteModal(false)}
         totalScores={lobby?.totalScores || {}}
         allPlayers={players}
-        lobbyId={lobbyId}
         currentUserId={currentUser?.uid || null}
-        onStartNewGame={handleStartNewGame}
         isHost={isHost}
       />
     </main>

@@ -9,9 +9,7 @@ export default function GameCompleteModal({
   onClose,
   totalScores,
   allPlayers,
-  lobbyId,
   currentUserId,
-  onStartNewGame,
   isHost,
 }) {
   const [scenarioRating, setScenarioRating] = useState(null);
