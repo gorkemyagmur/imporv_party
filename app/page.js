@@ -7,6 +7,7 @@ import { signInAnonymously } from "firebase/auth";
 import {
   doc,
   getDoc,
+  deleteDoc,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
@@ -118,27 +119,52 @@ export default function Home() {
       const requestRef = doc(db, "lobbies", trimmed, "pendingRequests", user.uid);
       const requestSnap = await getDoc(requestRef);
       
-      if (requestSnap.exists() && requestSnap.data().status !== "rejected") {
-        setJoinError("You already have a pending request. Please wait for admin approval.");
-        return;
+      if (requestSnap.exists()) {
+        const requestData = requestSnap.data();
+        if (requestData.status === "pending" || !requestData.status) {
+          setJoinError("You already have a pending request. Please wait for admin approval.");
+          return;
+        }
+        // If request is rejected, we'll delete it and create a new one
+        if (requestData.status === "rejected") {
+          try {
+            await deleteDoc(requestRef);
+          } catch (deleteError) {
+            console.error("Error deleting rejected request:", deleteError);
+            // Continue anyway, setDoc will overwrite
+          }
+        }
       }
 
       // Create pending request
-      await setDoc(requestRef, {
-        name,
-        requestedAt: serverTimestamp(),
-        status: "pending",
-      });
-
-      setJoinError("");
-      setJoinName("");
-      setJoinCode("");
-      
-      // Redirect to lobby page to wait for approval
-      router.push(`/lobby/${trimmed}`);
+      try {
+        await setDoc(requestRef, {
+          name,
+          requestedAt: serverTimestamp(),
+          status: "pending",
+        });
+        
+        console.log("Pending request created successfully for user:", user.uid);
+        
+        setJoinError("");
+        setJoinName("");
+        setJoinCode("");
+        
+        // Redirect to lobby page to wait for approval
+        router.push(`/lobby/${trimmed}`);
+      } catch (requestError) {
+        console.error("Error creating pending request:", requestError);
+        // If request creation fails, show specific error
+        if (requestError.code === "permission-denied") {
+          setJoinError("Permission denied. Please check Firestore security rules.");
+        } else {
+          setJoinError(`Could not create join request: ${requestError.message}`);
+        }
+        return;
+      }
     } catch (error) {
-      console.error(error);
-      setJoinError("Could not join lobby. Please try again.");
+      console.error("Error in handleJoinLobby:", error);
+      setJoinError(`Could not join lobby: ${error.message || "Please try again."}`);
     }
   }, [joinCode, joinName, router]);
 
