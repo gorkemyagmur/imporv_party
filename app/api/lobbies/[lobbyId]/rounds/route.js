@@ -67,6 +67,81 @@ function randomId(prefix) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
+// Generate round plan ensuring equal distribution
+function generateRoundPlan(players, maxRoundsPerPlayer) {
+  const playerIds = players.map((p) => p.id);
+  const totalPlayers = playerIds.length;
+  
+  // Create a pool of player appearances needed
+  const playerAppearances = {};
+  playerIds.forEach((id) => {
+    playerAppearances[id] = maxRoundsPerPlayer;
+  });
+  
+  const roundPlan = [];
+  let roundNumber = 1;
+  
+  // Strategy: Ensure all players play equal number of rounds
+  // Try to balance between having all players play together and smaller groups
+  
+  // Continue creating rounds until all players have played their required rounds
+  while (Object.values(playerAppearances).some((count) => count > 0)) {
+    const availablePlayers = playerIds.filter((id) => playerAppearances[id] > 0);
+    
+    if (availablePlayers.length === 0) break;
+    
+    // Determine performer count for this round
+    let performerCount;
+    
+    if (availablePlayers.length <= 3) {
+      // All available players play together
+      performerCount = availablePlayers.length;
+    } else {
+      // Calculate remaining appearances
+      const totalRemainingAppearances = Object.values(playerAppearances).reduce(
+        (sum, count) => sum + count, 
+        0
+      );
+      
+      // Try to use 3 performers if possible, otherwise 2
+      // Ensure we have enough rounds for all players
+      const minRoundsNeeded = Math.ceil(totalRemainingAppearances / 3);
+      const playersNeedingRounds = availablePlayers.length;
+      
+      // If we can fit everyone with 3-performer rounds, use 3
+      // Otherwise, use 2 to ensure fair distribution
+      if (minRoundsNeeded <= playersNeedingRounds && availablePlayers.length >= 3) {
+        performerCount = 3;
+      } else {
+        performerCount = 2;
+      }
+      
+      // Ensure we don't exceed available players
+      performerCount = Math.min(performerCount, availablePlayers.length);
+    }
+    
+    // Select performers for this round
+    // Prioritize players who need more rounds (have more appearances left)
+    const sortedAvailable = [...availablePlayers].sort((a, b) => {
+      return playerAppearances[b] - playerAppearances[a]; // More appearances needed = higher priority
+    });
+    
+    const performers = getRandomItems(sortedAvailable, performerCount);
+    
+    // Decrease appearance count for selected performers
+    performers.forEach((id) => {
+      playerAppearances[id]--;
+    });
+    
+    roundPlan.push({
+      roundNumber: roundNumber++,
+      performers: performers,
+    });
+  }
+  
+  return roundPlan;
+}
+
 export async function POST(request, { params }) {
   try {
     if (!adminDb) {
@@ -128,42 +203,51 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Get player round counts from totalScores to ensure equal distribution
-    const totalScores = lobbyData.totalScores || {};
-    const playerRoundCounts = players.map((p) => ({
-      ...p,
-      roundsPlayed: totalScores[p.id]?.roundsPlayed || 0,
-    }));
-
-    // Sort players by rounds played (ascending) to prioritize those who played less
-    playerRoundCounts.sort((a, b) => a.roundsPlayed - b.roundsPlayed);
-
-    // Select scenario and performers
+    // Get current round number
+    const currentRoundNumber = lobbyData.currentRoundNumber || 0;
+    const maxRoundsPerPlayer = lobbyData.maxRoundsPerPlayer || 3;
+    
+    // If this is the first round, generate the round plan
+    let roundPlan = lobbyData.roundPlan || null;
+    if (currentRoundNumber === 0 && !roundPlan) {
+      roundPlan = generateRoundPlan(players, maxRoundsPerPlayer);
+      // Save round plan to lobby
+      await lobbyRef.update({
+        roundPlan: roundPlan,
+        totalRounds: roundPlan.length,
+      });
+    }
+    
+    // If no round plan exists, create one (fallback)
+    if (!roundPlan) {
+      roundPlan = generateRoundPlan(players, maxRoundsPerPlayer);
+      await lobbyRef.update({
+        roundPlan: roundPlan,
+        totalRounds: roundPlan.length,
+      });
+    }
+    
+    // Get performers for current round from plan
+    const currentRoundPlan = roundPlan[currentRoundNumber];
+    if (!currentRoundPlan) {
+      return NextResponse.json(
+        { error: "No more rounds in plan" },
+        { status: 400 }
+      );
+    }
+    
+    // Get full player objects for performers
+    const performerIds = currentRoundPlan.performers;
+    const performers = players.filter((p) => performerIds.includes(p.id));
+    
+    // Select scenario based on performer count
     const eligibleScenarios = SCENARIOS.filter(
-      (scene) => scene.performers <= players.length
+      (scene) => scene.performers === performers.length || scene.performers <= performers.length
     );
     const scenarioPool =
       eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
     const scenario =
       scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
-    const performerCount = Math.min(
-      scenario.performers ?? (Math.random() > 0.5 ? 3 : 2),
-      players.length,
-      3
-    );
-
-    // Select performers prioritizing those who played fewer rounds
-    // First, get players with minimum rounds played
-    const minRounds = playerRoundCounts[0].roundsPlayed;
-    const availablePlayers = playerRoundCounts.filter(
-      (p) => p.roundsPlayed === minRounds
-    );
-    
-    // If we have enough players with min rounds, select from them
-    // Otherwise, select from all players but prioritize those with fewer rounds
-    const performers = availablePlayers.length >= performerCount
-      ? getRandomItems(availablePlayers, performerCount)
-      : getRandomItems(playerRoundCounts, performerCount);
     const rolesSelection = getRandomItems(ROLES, performers.length);
     const roleMap = performers.reduce((acc, performer, index) => {
       acc[performer.id] = rolesSelection[index];
@@ -191,10 +275,10 @@ export async function POST(request, { params }) {
       startedAt: FieldValue.serverTimestamp(),
       scores: {},
       ratings: {},
+      submittedRatings: {},
+      roundNumber: currentRoundNumber + 1,
+      roundPlan: currentRoundPlan, // Store which players are in this round
     });
-
-    // Get current round number and increment
-    const currentRoundNumber = lobbyData.currentRoundNumber || 0;
     
     // Update lobby document
     await lobbyRef.update({

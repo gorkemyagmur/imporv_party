@@ -406,13 +406,8 @@ export default function LobbyPage() {
       return;
     }
     
-    // Only performers (players with roles in this round) can rate
-    const isPerformer = currentRound.performers.some((p) => p.id === currentUser.uid);
-    if (!isPerformer) {
-      return;
-    }
-    
-    // Can only rate other performers in this round
+    // All players (performers and non-performers) can rate performers
+    // Can only rate performers in this round
     const isTargetPerformer = currentRound.performers.some((p) => p.id === performerId);
     if (!isTargetPerformer) {
       return;
@@ -434,32 +429,26 @@ export default function LobbyPage() {
       return;
     }
 
-    // Check if user is a performer
-    const isPerformer = currentRound.performers.some((p) => p.id === currentUser.uid);
-    if (!isPerformer) {
-      return;
-    }
-
     try {
       const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
       
-      // Mark this user's ratings as submitted
+      // Mark this user's ratings as submitted (all players can submit, not just performers)
       await updateDoc(roundRef, {
         [`submittedRatings.${currentUser.uid}`]: true,
       });
 
-      // Check if all performers have submitted
+      // Check if all players have submitted (all players in lobby, not just performers)
       const roundSnap = await getDoc(roundRef);
       if (!roundSnap.exists()) return;
       
       const roundData = roundSnap.data();
       const submittedRatings = roundData.submittedRatings || {};
-      const allPerformersSubmitted = currentRound.performers.every(
-        (performer) => submittedRatings[performer.id]
+      const allPlayersSubmitted = players.every(
+        (player) => submittedRatings[player.id]
       );
 
-      // If all performers submitted, calculate scores and move to results
-      if (allPerformersSubmitted) {
+      // If all players submitted, calculate scores and move to results
+      if (allPlayersSubmitted) {
         const allRatings = roundData.ratings || {};
 
         // Calculate average scores for each performer from all ratings
@@ -601,7 +590,7 @@ export default function LobbyPage() {
               </h1>
               {lobby && (lobby.currentRoundNumber > 0 || isRoundActive) && (
                 <p className="mt-1 text-sm text-purple-200">
-                  Round {lobby.currentRoundNumber || 0}
+                  Round {lobby.currentRoundNumber || 0} {lobby.totalRounds && `of ${lobby.totalRounds}`}
                 </p>
               )}
             </div>
@@ -767,7 +756,7 @@ export default function LobbyPage() {
                 onSubmit={handleSubmitRatings}
                 currentUserId={currentUser?.uid || null}
                 submittedRatings={currentRound.submittedRatings || {}}
-                isPerformer={currentRound.performers.some((p) => p.id === currentUser?.uid)}
+                allPlayersCount={players.length}
               />
             )}
 
