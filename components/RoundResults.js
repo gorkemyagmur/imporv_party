@@ -12,6 +12,7 @@ export default function RoundResults({
   isHost,
   currentRoundNumber,
   totalRounds,
+  onStartNewGame,
 }) {
   const [scenarioRating, setScenarioRating] = useState(null);
   const [taskRating, setTaskRating] = useState(null);
@@ -224,6 +225,16 @@ export default function RoundResults({
                 ✓ Geri bildiriminiz gönderildi. Teşekkürler!
               </p>
             </div>
+          )}
+
+          {/* Yeni Oyun Başlat Button (Admin only) */}
+          {isHost && onStartNewGame && (
+            <button
+              onClick={onStartNewGame}
+              className="mt-4 w-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-6 py-4 text-lg font-semibold text-black shadow-xl shadow-emerald-400/40 transition active:scale-[0.99]"
+            >
+              Yeni Oyun Başlat
+            </button>
           )}
         </div>
       ) : isHost ? (

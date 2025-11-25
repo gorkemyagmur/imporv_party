@@ -828,6 +828,7 @@ export default function LobbyPage() {
                 isHost={isHost}
                 currentRoundNumber={lobby?.currentRoundNumber || 0}
                 totalRounds={lobby?.totalRounds || 0}
+                onStartNewGame={handleStartNewGame}
               />
             )}
           </section>
