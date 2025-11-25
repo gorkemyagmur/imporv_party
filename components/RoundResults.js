@@ -6,6 +6,8 @@ export default function RoundResults({
   totalScores,
   allPlayers,
   isHost,
+  currentRoundNumber,
+  totalRounds,
 }) {
   // Sort players by total score for leaderboard
   const sortedPlayers = allPlayers
@@ -89,12 +91,19 @@ export default function RoundResults({
         </div>
       )}
 
-      {isHost ? (
+      {/* Check if all rounds are completed */}
+      {currentRoundNumber >= totalRounds && totalRounds > 0 ? (
+        <div className="mt-6 rounded-3xl bg-white/10 p-5 text-center text-white">
+          <p className="text-sm text-purple-100">
+            Tüm roundlar tamamlandı! Oyun sonu sonuçları gösteriliyor...
+          </p>
+        </div>
+      ) : isHost ? (
         <button
           onClick={onNextRound}
           className="mt-6 w-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-3 text-base font-semibold text-black shadow-lg shadow-emerald-400/40"
         >
-          Start next round
+          {currentRoundNumber > 0 ? "Start Next Round" : "Start New Round"}
         </button>
       ) : (
         <div className="mt-6 rounded-3xl bg-white/10 p-5 text-center text-white">

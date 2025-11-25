@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const SCORE_LABELS = ["1", "2", "3", "4", "5"];
 
@@ -50,37 +48,28 @@ export default function GameCompleteModal({
   }
 
   const handleSubmitFeedback = async () => {
-    if (!lobbyId || !currentUserId) return;
     if (!scenarioRating || !taskRating) {
       alert("Lütfen senaryolar ve görevler için puan verin.");
       return;
     }
 
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, "lobbies", lobbyId, "feedback"), {
-        userId: currentUserId,
-        scenarioRating: Number(scenarioRating),
-        taskRating: Number(taskRating),
-        feedbackText: feedbackText.trim() || null,
-        submittedAt: serverTimestamp(),
-      });
-      setHasSubmitted(true);
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      alert("Geri bildirim gönderilirken bir hata oluştu. Lütfen tekrar deneyin.");
-    } finally {
+    
+    // Simulate submission delay
+    setTimeout(() => {
       setIsSubmitting(false);
-    }
+      alert("Geri Bildiriminiz İçin Teşekkürler");
+      onClose();
+    }, 500);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="relative w-full max-w-2xl rounded-3xl border border-white/20 bg-gradient-to-br from-purple-900/90 to-pink-900/90 p-6 text-white shadow-2xl">
-        {/* Close button */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-3xl border border-white/20 bg-gradient-to-br from-purple-900/90 to-pink-900/90 p-6 text-white shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+        {/* Close button - always visible */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+          className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
           aria-label="Close"
         >
           <svg
@@ -98,7 +87,7 @@ export default function GameCompleteModal({
           </svg>
         </button>
 
-        <div className="space-y-6">
+        <div className="space-y-6 pr-2">
           {/* Title */}
           <div className="text-center">
             <h2 className="text-3xl font-bold">Oyun Tamamlandı! 🎉</h2>
@@ -253,24 +242,13 @@ export default function GameCompleteModal({
             </div>
           )}
 
-          {/* Start New Game Button (Host only) */}
-          {isHost && (
+          {/* Start New Game Button (Host only) - shown after feedback submission */}
+          {isHost && hasSubmitted && (
             <button
               onClick={onStartNewGame}
-              disabled={!hasSubmitted}
-              className="w-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-3 text-base font-semibold text-black shadow-lg shadow-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-3 text-base font-semibold text-black shadow-lg shadow-emerald-400/40"
             >
-              {hasSubmitted ? "Yeni Oyun Başlat" : "Önce geri bildirim gönderin"}
-            </button>
-          )}
-          
-          {/* Close button for non-host users */}
-          {!isHost && hasSubmitted && (
-            <button
-              onClick={onClose}
-              className="w-full rounded-full bg-gradient-to-r from-gray-500 to-gray-600 px-4 py-3 text-base font-semibold text-white shadow-lg"
-            >
-              Kapat
+              Yeni Oyun Başlat
             </button>
           )}
         </div>
