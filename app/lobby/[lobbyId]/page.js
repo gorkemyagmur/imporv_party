@@ -817,11 +817,11 @@ export default function LobbyPage() {
               />
             )}
 
-            {phase === "results" && lobby?.status !== "finished" && (
+            {(phase === "results" || lobby?.status === "finished") && (
               <RoundResults
-                performers={currentRound.performers}
-                scores={currentRound.scores}
-                winnerId={currentRound.winnerId}
+                performers={currentRound?.performers || []}
+                scores={currentRound?.scores || {}}
+                winnerId={currentRound?.winnerId || null}
                 onNextRound={handleNextRound}
                 totalScores={lobby?.totalScores || {}}
                 allPlayers={players}
