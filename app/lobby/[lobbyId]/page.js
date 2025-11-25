@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -115,21 +116,30 @@ export default function LobbyPage() {
 
   // Listen to pending requests (only for host)
   useEffect(() => {
-    if (!lobbyId || !isHost) return;
+    if (!lobbyId || !lobby || !currentUser) return;
+    // Check if current user is host
+    const userIsHost = currentUser.uid === lobby.hostId;
+    if (!userIsHost) return;
+    
     const requestsRef = collection(db, "lobbies", lobbyId, "pendingRequests");
     const unsubscribe = onSnapshot(requestsRef, (snap) => {
-      const requestsList = snap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
+      const requestsList = snap.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+        .filter((req) => req.status === "pending" || !req.status); // Only show pending requests
       setPendingRequests(requestsList);
     });
     return () => unsubscribe();
-  }, [lobbyId, isHost]);
+  }, [lobbyId, lobby, currentUser]);
 
   // Listen to user's request status (for non-host users)
   useEffect(() => {
-    if (!lobbyId || !currentUser || isHost) return;
+    if (!lobbyId || !currentUser || !lobby) return;
+    // Only listen if user is not the host
+    if (currentUser.uid === lobby.hostId) return;
+    
     const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", currentUser.uid);
     const unsubscribe = onSnapshot(requestRef, (snap) => {
       if (snap.exists()) {
@@ -145,7 +155,7 @@ export default function LobbyPage() {
       }
     });
     return () => unsubscribe();
-  }, [lobbyId, currentUser, isHost]);
+  }, [lobbyId, currentUser, lobby]);
 
   // Listen to current round
   useEffect(() => {
@@ -201,11 +211,11 @@ export default function LobbyPage() {
   }
 
   async function handleAcceptRequest(requestId) {
-    if (!isHost || !lobbyId) return;
+    if (!lobbyId || !lobby || !currentUser || currentUser.uid !== lobby.hostId) return;
     
     try {
       const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", requestId);
-      const requestSnap = await requestRef.get();
+      const requestSnap = await getDoc(requestRef);
       
       if (!requestSnap.exists()) return;
       
@@ -235,7 +245,7 @@ export default function LobbyPage() {
   }
 
   async function handleRejectRequest(requestId) {
-    if (!isHost || !lobbyId) return;
+    if (!lobbyId || !lobby || !currentUser || currentUser.uid !== lobby.hostId) return;
     
     try {
       const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", requestId);
@@ -419,7 +429,8 @@ export default function LobbyPage() {
 
   const canStartRound = players.length >= 2 && !isRoundActive && isHost;
   const isUserInLobby = currentUser && players.some((p) => p.id === currentUser.uid);
-  const isWaitingForApproval = !isHost && !isUserInLobby && userPendingRequest && userPendingRequest.status === "pending";
+  const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+  const isWaitingForApproval = !userIsHost && !isUserInLobby && userPendingRequest && (userPendingRequest.status === "pending" || !userPendingRequest.status);
 
   return (
     <main className="min-h-screen px-4 pb-28 pt-8 sm:px-6">
