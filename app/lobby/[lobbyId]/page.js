@@ -71,19 +71,21 @@ export default function LobbyPage() {
         }
         setLobby(data);
         setDuration(data.roundDuration || 60);
-        // Reset round if no currentRoundId
-        if (!data.currentRoundId) {
-          setCurrentRound(null);
-          setRatings({});
-        }
+        
         // Show game complete modal if game is finished
         if (data.status === "finished") {
           setCurrentRound(null); // Clear current round when game is finished
           setRatings({});
-          setShowGameCompleteModal(true);
+          // Use setTimeout to ensure state update happens after render
+          setTimeout(() => {
+            setShowGameCompleteModal(true);
+          }, 100);
         } else {
-          // Reset modal state when game is not finished
-          setShowGameCompleteModal(false);
+          // Reset round if no currentRoundId (only when not finished)
+          if (!data.currentRoundId) {
+            setCurrentRound(null);
+            setRatings({});
+          }
         }
       } else {
         // Lobby doesn't exist, redirect to home
@@ -551,7 +553,11 @@ export default function LobbyPage() {
         });
         setRatings({});
         setCurrentRound(null); // Clear current round immediately
-        setShowGameCompleteModal(true);
+        // Modal will be opened by useEffect when status changes to "finished"
+        // But also set it here as backup
+        setTimeout(() => {
+          setShowGameCompleteModal(true);
+        }, 200);
         return;
       }
       
