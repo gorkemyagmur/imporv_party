@@ -91,34 +91,50 @@ export default function Home() {
         return;
       }
 
+      const lobbyData = lobbySnap.data();
+      
+      // Check if lobby is closed
+      if (lobbyData.closed) {
+        setJoinError("This lobby is closed.");
+        return;
+      }
+
       const name = joinName.trim() || "Guest";
 
+      // Check if user is already in the lobby
       const playerRef = doc(db, "lobbies", trimmed, "players", user.uid);
-      await setDoc(
-        playerRef,
-        {
-          name,
-          joinedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const playerSnap = await getDoc(playerRef);
+      
+      if (playerSnap.exists()) {
+        // User is already in lobby, redirect
+        setJoinError("");
+        setJoinName("");
+        setJoinCode("");
+        router.push(`/lobby/${trimmed}`);
+        return;
+      }
 
-      await setDoc(
-        lobbyRef,
-        {
-          playerMap: {
-            [user.uid]: {
-              name,
-              joinedAt: serverTimestamp(),
-            },
-          },
-        },
-        { merge: true }
-      );
+      // Check if user already has a pending request
+      const requestRef = doc(db, "lobbies", trimmed, "pendingRequests", user.uid);
+      const requestSnap = await getDoc(requestRef);
+      
+      if (requestSnap.exists() && requestSnap.data().status !== "rejected") {
+        setJoinError("You already have a pending request. Please wait for admin approval.");
+        return;
+      }
+
+      // Create pending request
+      await setDoc(requestRef, {
+        name,
+        requestedAt: serverTimestamp(),
+        status: "pending",
+      });
 
       setJoinError("");
       setJoinName("");
       setJoinCode("");
+      
+      // Redirect to lobby page to wait for approval
       router.push(`/lobby/${trimmed}`);
     } catch (error) {
       console.error(error);

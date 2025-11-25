@@ -26,13 +26,17 @@ export default function LobbyPage() {
   const router = useRouter();
   const lobbyId = (params?.lobbyId || "").toString();
   const [players, setPlayers] = useState([]);
-  const [playerName, setPlayerName] = useState("");
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [currentRound, setCurrentRound] = useState(null);
   const [ratings, setRatings] = useState({});
   const [duration, setDuration] = useState(60);
   const [lobby, setLobby] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showRemovedModal, setShowRemovedModal] = useState(false);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [userPendingRequest, setUserPendingRequest] = useState(null);
+  const [wasInLobby, setWasInLobby] = useState(false);
 
   const lobbyCode = (lobbyId || "").toUpperCase();
   const isRoundActive = Boolean(currentRound);
@@ -76,6 +80,16 @@ export default function LobbyPage() {
     return () => unsubscribe();
   }, [lobbyId, router]);
 
+  // Track if user was in lobby initially
+  useEffect(() => {
+    if (currentUser && players.length > 0) {
+      const isInLobby = players.some((p) => p.id === currentUser.uid);
+      if (isInLobby && !wasInLobby) {
+        setWasInLobby(true);
+      }
+    }
+  }, [currentUser, players, wasInLobby]);
+
   // Listen to players subcollection
   useEffect(() => {
     if (!lobbyId || !currentUser) return;
@@ -85,17 +99,53 @@ export default function LobbyPage() {
         id: docSnap.id,
         ...docSnap.data(),
       }));
-      setPlayers(playersList);
-
+      
       // Check if current user was removed from the lobby
       const isUserInLobby = playersList.some((p) => p.id === currentUser.uid);
-      if (!isUserInLobby && currentUser) {
-        // User was removed, redirect to home
-        router.push("/");
+      if (!isUserInLobby && wasInLobby && currentUser && lobby) {
+        // User was removed, show modal
+        setShowRemovedModal(true);
+        setWasInLobby(false);
+      }
+      
+      setPlayers(playersList);
+    });
+    return () => unsubscribe();
+  }, [lobbyId, currentUser, router, lobby, wasInLobby]);
+
+  // Listen to pending requests (only for host)
+  useEffect(() => {
+    if (!lobbyId || !isHost) return;
+    const requestsRef = collection(db, "lobbies", lobbyId, "pendingRequests");
+    const unsubscribe = onSnapshot(requestsRef, (snap) => {
+      const requestsList = snap.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setPendingRequests(requestsList);
+    });
+    return () => unsubscribe();
+  }, [lobbyId, isHost]);
+
+  // Listen to user's request status (for non-host users)
+  useEffect(() => {
+    if (!lobbyId || !currentUser || isHost) return;
+    const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", currentUser.uid);
+    const unsubscribe = onSnapshot(requestRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserPendingRequest(data);
+        if (data.status === "rejected") {
+          setShowRejectedModal(true);
+          // Delete the rejected request
+          deleteDoc(requestRef);
+        }
+      } else {
+        setUserPendingRequest(null);
       }
     });
     return () => unsubscribe();
-  }, [lobbyId, currentUser, router]);
+  }, [lobbyId, currentUser, isHost]);
 
   // Listen to current round
   useEffect(() => {
@@ -124,64 +174,82 @@ export default function LobbyPage() {
     return () => unsubscribe();
   }, [lobbyId, lobby?.currentRoundId, currentUser]);
 
-  async function handleAddPlayer(event) {
-    event?.preventDefault();
-    const trimmed = playerName.trim();
-    if (!trimmed || lobbyIsFull || !currentUser || !lobbyId) {
-      return;
-    }
-
-    // Check if current user is already in the list
-    const existingPlayer = players.find((p) => p.id === currentUser.uid);
-    if (existingPlayer) {
-      // User already in list, just update their name
+  async function handleShareLobby() {
+    const shareUrl = `${window.location.origin}/lobby/${lobbyId}`;
+    const shareText = `Join my Improv Party lobby! Code: ${lobbyCode}\n${shareUrl}`;
+    
+    if (navigator.share) {
       try {
-        const playerRef = doc(db, "lobbies", lobbyId, "players", currentUser.uid);
-        await setDoc(
-          playerRef,
-          {
-            name: trimmed,
-            joinedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        // Update playerMap in lobby document
-        const lobbyRef = doc(db, "lobbies", lobbyId);
-        await updateDoc(lobbyRef, {
-          [`playerMap.${currentUser.uid}`]: {
-            name: trimmed,
-            joinedAt: serverTimestamp(),
-          },
+        await navigator.share({
+          title: "Join my Improv Party lobby",
+          text: shareText,
+          url: shareUrl,
         });
-
-        setPlayerName("");
       } catch (err) {
-        console.error("Error updating player:", err);
+        // User cancelled or error occurred
+        if (err.name !== "AbortError") {
+          // Fallback to clipboard
+          await navigator.clipboard.writeText(shareText);
+          alert("Link copied to clipboard!");
+        }
       }
-      return;
+    } else {
+      // Fallback to clipboard
+      await navigator.clipboard.writeText(shareText);
+      alert("Link copied to clipboard!");
     }
+  }
 
-    // New player - add them to the list
+  async function handleAcceptRequest(requestId) {
+    if (!isHost || !lobbyId) return;
+    
     try {
-      const playerRef = doc(db, "lobbies", lobbyId, "players", currentUser.uid);
+      const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", requestId);
+      const requestSnap = await requestRef.get();
+      
+      if (!requestSnap.exists()) return;
+      
+      const requestData = requestSnap.data();
+      
+      // Add player to lobby
+      const playerRef = doc(db, "lobbies", lobbyId, "players", requestId);
       await setDoc(playerRef, {
-        name: trimmed,
+        name: requestData.name,
         joinedAt: serverTimestamp(),
       });
 
       // Update playerMap in lobby document
       const lobbyRef = doc(db, "lobbies", lobbyId);
       await updateDoc(lobbyRef, {
-        [`playerMap.${currentUser.uid}`]: {
-          name: trimmed,
+        [`playerMap.${requestId}`]: {
+          name: requestData.name,
           joinedAt: serverTimestamp(),
         },
       });
 
-      setPlayerName("");
+      // Delete the request
+      await deleteDoc(requestRef);
     } catch (err) {
-      console.error("Error adding player:", err);
+      console.error("Error accepting request:", err);
+    }
+  }
+
+  async function handleRejectRequest(requestId) {
+    if (!isHost || !lobbyId) return;
+    
+    try {
+      const requestRef = doc(db, "lobbies", lobbyId, "pendingRequests", requestId);
+      await updateDoc(requestRef, {
+        status: "rejected",
+        rejectedAt: serverTimestamp(),
+      });
+      
+      // Delete after a short delay to allow the user to see the rejection
+      setTimeout(async () => {
+        await deleteDoc(requestRef);
+      }, 2000);
+    } catch (err) {
+      console.error("Error rejecting request:", err);
     }
   }
 
@@ -350,6 +418,8 @@ export default function LobbyPage() {
   const phase = currentRound?.status ?? "idle";
 
   const canStartRound = players.length >= 2 && !isRoundActive && isHost;
+  const isUserInLobby = currentUser && players.some((p) => p.id === currentUser.uid);
+  const isWaitingForApproval = !isHost && !isUserInLobby && userPendingRequest && userPendingRequest.status === "pending";
 
   return (
     <main className="min-h-screen px-4 pb-28 pt-8 sm:px-6">
@@ -363,7 +433,12 @@ export default function LobbyPage() {
               {lobbyCode || "----"}
             </h1>
             <div className="flex flex-col items-end gap-2">
-              <p className="text-sm text-purple-100">Share with everyone</p>
+              <button
+                onClick={handleShareLobby}
+                className="rounded-full bg-gradient-to-r from-teal-400 to-sky-400 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-500/40 transition hover:scale-[1.02]"
+              >
+                Share
+              </button>
               {isHost && (
                 <button
                   onClick={handleCloseLobby}
@@ -380,18 +455,64 @@ export default function LobbyPage() {
           <div className="rounded-3xl bg-white/10 p-5 text-center text-white">
             Loading lobby...
           </div>
+        ) : isWaitingForApproval ? (
+          <div className="rounded-3xl bg-white/10 p-8 text-center">
+            <div className="mb-4">
+              <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-purple-200 border-t-pink-500"></div>
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-2">
+              Giriş İzni Bekleniyor
+            </h2>
+            <p className="text-purple-100">
+              Admin onayı bekleniyor. Lütfen bekleyin...
+            </p>
+          </div>
         ) : (
           <>
             <PlayerList
               players={players}
-              playerName={playerName}
-              onPlayerNameChange={setPlayerName}
-              onAddPlayer={handleAddPlayer}
               onRemovePlayer={handleRemovePlayer}
-              isFull={lobbyIsFull}
               isHost={isHost}
               currentUserId={currentUser?.uid || null}
             />
+
+            {isHost && pendingRequests.length > 0 && (
+              <section className="rounded-3xl bg-white/10 p-5 shadow-lg shadow-black/40">
+                <h2 className="text-lg font-semibold text-white mb-4">
+                  Giriş İzni Bekleyenler ({pendingRequests.length})
+                </h2>
+                <ul className="space-y-3">
+                  {pendingRequests.map((request) => (
+                    <li
+                      key={request.id}
+                      className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-yellow-500/70 via-orange-500/70 to-red-500/70 text-base font-semibold text-white">
+                          {request.name.slice(0, 2).toUpperCase()}
+                        </span>
+                        <p className="text-base font-medium text-white">{request.name}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAcceptRequest(request.id)}
+                          disabled={lobbyIsFull}
+                          className="rounded-full bg-gradient-to-r from-green-400 to-emerald-400 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Kabul Et
+                        </button>
+                        <button
+                          onClick={() => handleRejectRequest(request.id)}
+                          className="rounded-full bg-gradient-to-r from-red-400 to-pink-400 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-red-500/40"
+                        >
+                          Reddet
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {!isRoundActive && isHost && (
               <DurationSelector value={duration} onChange={handleDurationChange} />
@@ -469,6 +590,52 @@ export default function LobbyPage() {
         )}
 
       </div>
+
+      {/* Removed Modal */}
+      {showRemovedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 rounded-3xl bg-gradient-to-br from-purple-900/95 to-indigo-900/95 p-6 shadow-2xl border border-white/20 max-w-sm w-full">
+            <h2 className="text-2xl font-bold text-white mb-4 text-center">
+              Odadan Çıkarıldınız
+            </h2>
+            <p className="text-purple-100 text-center mb-6">
+              Admin tarafından odadan çıkarıldınız.
+            </p>
+            <button
+              onClick={() => {
+                setShowRemovedModal(false);
+                router.push("/");
+              }}
+              className="w-full rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/40"
+            >
+              Ana Sayfaya Dön
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rejected Modal */}
+      {showRejectedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 rounded-3xl bg-gradient-to-br from-purple-900/95 to-indigo-900/95 p-6 shadow-2xl border border-white/20 max-w-sm w-full">
+            <h2 className="text-2xl font-bold text-white mb-4 text-center">
+              Giriş İsteğiniz Reddedildi
+            </h2>
+            <p className="text-purple-100 text-center mb-6">
+              Admin giriş isteğinizi reddetti.
+            </p>
+            <button
+              onClick={() => {
+                setShowRejectedModal(false);
+                router.push("/");
+              }}
+              className="w-full rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/40"
+            >
+              Ana Sayfaya Dön
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

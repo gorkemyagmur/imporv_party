@@ -1,10 +1,6 @@
 export default function PlayerList({
   players,
-  playerName,
-  onPlayerNameChange,
-  onAddPlayer,
   onRemovePlayer,
-  isFull,
   isHost = false,
   currentUserId = null,
 }) {
@@ -46,37 +42,10 @@ export default function PlayerList({
         ))}
         {players.length === 0 && (
           <li className="rounded-2xl bg-white/5 px-4 py-3 text-sm text-purple-100">
-            Add at least three players to start the fun.
+            Waiting for players to join...
           </li>
         )}
       </ul>
-
-      <form
-        className="mt-5 flex flex-col gap-3 sm:flex-row"
-        onSubmit={onAddPlayer}
-      >
-        <input
-          type="text"
-          value={playerName}
-          onChange={(event) => onPlayerNameChange(event.target.value)}
-          placeholder={isFull ? "Lobby is full" : "Player name"}
-          disabled={isFull}
-          className="flex-1 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-purple-200 focus:border-pink-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={isFull}
-          className="rounded-full bg-gradient-to-r from-teal-400 to-sky-400 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Add player
-        </button>
-      </form>
-
-      {isFull && (
-        <p className="mt-2 text-xs text-purple-100">
-          Lobby limit reached. Remove someone or start a round.
-        </p>
-      )}
     </section>
   );
 }
