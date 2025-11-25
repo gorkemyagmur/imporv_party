@@ -816,7 +816,7 @@ export default function LobbyPage() {
               />
             )}
 
-            {phase === "results" && (
+            {phase === "results" && lobby?.status !== "finished" && (
               <RoundResults
                 performers={currentRound.performers}
                 scores={currentRound.scores}

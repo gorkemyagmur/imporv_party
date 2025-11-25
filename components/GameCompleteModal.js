@@ -64,7 +64,7 @@ export default function GameCompleteModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-3xl border border-white/20 bg-gradient-to-br from-purple-900/90 to-pink-900/90 p-6 text-white shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
         {/* Close button - always visible */}
         <button
