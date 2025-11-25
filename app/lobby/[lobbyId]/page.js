@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import CountdownTimer from "@/components/CountdownTimer";
 import DurationSelector from "@/components/DurationSelector";
+import MaxRoundsSelector from "@/components/MaxRoundsSelector";
 import PerformerRoleCard from "@/components/PerformerRoleCard";
 import PlayerList from "@/components/PlayerList";
 import RatingPanel from "@/components/RatingPanel";
@@ -185,27 +186,27 @@ export default function LobbyPage() {
   }, [lobbyId, lobby?.currentRoundId, currentUser]);
 
   async function handleShareLobby() {
-    const shareUrl = `${window.location.origin}/lobby/${lobbyId}`;
-    const shareText = `Join my Improv Party lobby! Code: ${lobbyCode}\n${shareUrl}`;
+    const homeUrl = `${window.location.origin}/?code=${lobbyId}`;
+    const shareText = `Join my Improv Party lobby! Code: ${lobbyCode}\n${homeUrl}`;
     
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Join my Improv Party lobby",
           text: shareText,
-          url: shareUrl,
+          url: homeUrl,
         });
       } catch (err) {
         // User cancelled or error occurred
         if (err.name !== "AbortError") {
           // Fallback to clipboard
-          await navigator.clipboard.writeText(shareText);
+          await navigator.clipboard.writeText(homeUrl);
           alert("Link copied to clipboard!");
         }
       }
     } else {
       // Fallback to clipboard
-      await navigator.clipboard.writeText(shareText);
+      await navigator.clipboard.writeText(homeUrl);
       alert("Link copied to clipboard!");
     }
   }
@@ -267,6 +268,12 @@ export default function LobbyPage() {
     // Only host can remove players
     const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
     if (!userIsHost || !lobbyId) return;
+
+    // Cannot remove players during an active round
+    if (isRoundActive && (lobby?.status === "countdown" || lobby?.status === "rating")) {
+      alert("Cannot remove players while a round is in progress. Please wait until the round is finished.");
+      return;
+    }
 
     try {
       const playerRef = doc(db, "lobbies", lobbyId, "players", playerId);
@@ -345,7 +352,8 @@ export default function LobbyPage() {
   }
 
   async function handleDurationChange(newDuration) {
-    if (!isHost || !lobbyId || isRoundActive) return;
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId || isRoundActive) return;
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
       await updateDoc(lobbyRef, {
@@ -354,6 +362,19 @@ export default function LobbyPage() {
       setDuration(newDuration);
     } catch (err) {
       console.error("Error updating duration:", err);
+    }
+  }
+
+  async function handleMaxRoundsChange(maxRounds) {
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId || isRoundActive) return;
+    try {
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        maxRounds: maxRounds,
+      });
+    } catch (err) {
+      console.error("Error updating max rounds:", err);
     }
   }
 
@@ -375,7 +396,25 @@ export default function LobbyPage() {
 
 
   async function handleRatingChange(performerId, value) {
-    if (!currentUser || !lobbyId || !lobby?.currentRoundId) return;
+    if (!currentUser || !lobbyId || !lobby?.currentRoundId || !currentRound) return;
+    
+    // User cannot rate themselves
+    if (performerId === currentUser.uid) {
+      return;
+    }
+    
+    // Only performers (players with roles in this round) can rate
+    const isPerformer = currentRound.performers.some((p) => p.id === currentUser.uid);
+    if (!isPerformer) {
+      return;
+    }
+    
+    // Can only rate other performers in this round
+    const isTargetPerformer = currentRound.performers.some((p) => p.id === performerId);
+    if (!isTargetPerformer) {
+      return;
+    }
+    
     try {
       const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
       await updateDoc(roundRef, {
@@ -388,37 +427,93 @@ export default function LobbyPage() {
   }
 
   async function handleSubmitRatings() {
-    if (!currentRound || !lobbyId || !lobby?.currentRoundId) {
+    if (!currentRound || !lobbyId || !lobby?.currentRoundId || !currentUser) {
       return;
     }
 
-    // Calculate scores from all ratings
-    // This should ideally be done server-side, but for now we'll calculate client-side
-    const scores = currentRound.performers.reduce((acc, performer) => {
-      acc[performer.id] = ratings[performer.id] ?? 0;
-      return acc;
-    }, {});
+    // Get all ratings from Firestore (not just current user's ratings)
+    const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+    const roundSnap = await getDoc(roundRef);
+    if (!roundSnap.exists()) return;
+    
+    const roundData = roundSnap.data();
+    const allRatings = roundData.ratings || {};
 
-    const winner = [...currentRound.performers].sort((a, b) => {
-      const scoreDiff = (scores[b.id] ?? 0) - (scores[a.id] ?? 0);
-      if (scoreDiff !== 0) {
-        return scoreDiff;
+    // Calculate average scores for each performer from all ratings
+    const scores = {};
+    currentRound.performers.forEach((performer) => {
+      const performerRatings = [];
+      // Collect all ratings for this performer (excluding self-ratings)
+      Object.keys(allRatings).forEach((raterId) => {
+        if (raterId !== performer.id && allRatings[raterId]?.[performer.id]) {
+          performerRatings.push(allRatings[raterId][performer.id]);
+        }
+      });
+      
+      // Calculate average
+      if (performerRatings.length > 0) {
+        const sum = performerRatings.reduce((acc, val) => acc + val, 0);
+        scores[performer.id] = sum / performerRatings.length;
+      } else {
+        scores[performer.id] = 0;
       }
-      return a.name.localeCompare(b.name);
-    })[0];
+    });
+
+    // Find winner(s) - only if there's a clear winner (no ties)
+    const sortedPerformers = [...currentRound.performers].sort((a, b) => {
+      return (scores[b.id] ?? 0) - (scores[a.id] ?? 0);
+    });
+    
+    let winnerId = null;
+    let winnerName = null;
+    
+    // Only set winner if there's a clear winner (highest score is unique)
+    if (sortedPerformers.length > 0) {
+      const highestScore = scores[sortedPerformers[0].id];
+      const winnersWithHighestScore = sortedPerformers.filter(
+        (p) => scores[p.id] === highestScore
+      );
+      
+      // Only set winner if exactly one player has the highest score
+      if (winnersWithHighestScore.length === 1) {
+        winnerId = sortedPerformers[0].id;
+        winnerName = sortedPerformers[0].name;
+      }
+    }
 
     try {
-      const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+      // Update round with scores
       await updateDoc(roundRef, {
         status: "results",
         scores,
-        winnerId: winner.id,
-        winnerName: winner.name,
+        winnerId: winnerId,
+        winnerName: winnerName,
       });
 
+      // Update lobby status
       const lobbyRef = doc(db, "lobbies", lobbyId);
+      const lobbySnap = await getDoc(lobbyRef);
+      const lobbyData = lobbySnap.data();
+      
+      // Update total scores in lobby
+      const currentTotalScores = lobbyData.totalScores || {};
+      const updatedTotalScores = { ...currentTotalScores };
+      
+      currentRound.performers.forEach((performer) => {
+        if (!updatedTotalScores[performer.id]) {
+          updatedTotalScores[performer.id] = {
+            name: performer.name,
+            totalScore: 0,
+            roundsPlayed: 0,
+          };
+        }
+        updatedTotalScores[performer.id].totalScore += scores[performer.id] || 0;
+        updatedTotalScores[performer.id].roundsPlayed += 1;
+      });
+
       await updateDoc(lobbyRef, {
         status: "results",
+        totalScores: updatedTotalScores,
       });
     } catch (err) {
       console.error("Error submitting ratings:", err);
@@ -426,13 +521,31 @@ export default function LobbyPage() {
   }
 
   async function handleNextRound() {
-    if (!isHost || !lobbyId) return;
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId || !lobby) return;
+    
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
+      const currentRoundNumber = lobby.currentRoundNumber || 0;
+      const maxRounds = lobby.maxRounds || 999; // Default to unlimited
+      
+      // Check if game is finished
+      if (currentRoundNumber >= maxRounds) {
+        await updateDoc(lobbyRef, {
+          status: "finished",
+          currentRoundId: null,
+          startedAt: null,
+        });
+        setRatings({});
+        return;
+      }
+      
+      // Increment round number
       await updateDoc(lobbyRef, {
         status: "idle",
         currentRoundId: null,
         startedAt: null,
+        currentRoundNumber: currentRoundNumber + 1,
       });
       setRatings({});
     } catch (err) {
@@ -455,9 +568,16 @@ export default function LobbyPage() {
             Lobby code
           </p>
           <div className="flex items-end justify-between">
-            <h1 className="text-4xl font-semibold text-white">
-              {lobbyCode || "----"}
-            </h1>
+            <div>
+              <h1 className="text-4xl font-semibold text-white">
+                {lobbyCode || "----"}
+              </h1>
+              {lobby && (lobby.currentRoundNumber > 0 || isRoundActive) && (
+                <p className="mt-1 text-sm text-purple-200">
+                  Round {lobby.currentRoundNumber || 0} / {lobby.maxRounds || 5}
+                </p>
+              )}
+            </div>
             <div className="flex flex-col items-end gap-2">
               <button
                 onClick={handleShareLobby}
@@ -541,7 +661,14 @@ export default function LobbyPage() {
             )}
 
             {!isRoundActive && isHost && (
-              <DurationSelector value={duration} onChange={handleDurationChange} />
+              <>
+                <DurationSelector value={duration} onChange={handleDurationChange} />
+                <MaxRoundsSelector 
+                  value={lobby?.maxRounds || 5} 
+                  onChange={handleMaxRoundsChange}
+                  disabled={lobby?.currentRoundNumber > 0}
+                />
+              </>
             )}
 
             {isHost && (
@@ -601,6 +728,7 @@ export default function LobbyPage() {
                 ratings={ratings}
                 onRatingChange={handleRatingChange}
                 onSubmit={handleSubmitRatings}
+                currentUserId={currentUser?.uid || null}
               />
             )}
 
@@ -610,6 +738,8 @@ export default function LobbyPage() {
                 scores={currentRound.scores}
                 winnerId={currentRound.winnerId}
                 onNextRound={handleNextRound}
+                totalScores={lobby?.totalScores || {}}
+                allPlayers={players}
               />
             )}
           </section>

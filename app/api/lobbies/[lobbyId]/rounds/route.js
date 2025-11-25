@@ -172,12 +172,16 @@ export async function POST(request, { params }) {
       ratings: {},
     });
 
+    // Get current round number and increment
+    const currentRoundNumber = lobbyData.currentRoundNumber || 0;
+    
     // Update lobby document
     await lobbyRef.update({
       status: "countdown",
       currentRoundId: roundId,
       startedAt: FieldValue.serverTimestamp(),
       roundDuration: duration,
+      currentRoundNumber: currentRoundNumber + 1,
     });
 
     return NextResponse.json({

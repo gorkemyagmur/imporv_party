@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import {
@@ -31,11 +31,20 @@ async function ensureAnonUser() {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [hostName, setHostName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinName, setJoinName] = useState("");
   const [createError, setCreateError] = useState("");
   const [joinError, setJoinError] = useState("");
+
+  // Check for code in URL query params
+  useEffect(() => {
+    const codeFromUrl = searchParams.get("code");
+    if (codeFromUrl) {
+      setJoinCode(codeFromUrl.toUpperCase());
+    }
+  }, [searchParams]);
 
   const handleCreateLobby = useCallback(async () => {
     try {
@@ -52,6 +61,9 @@ export default function Home() {
         currentRoundId: null,
         startedAt: null,
         roundDuration: 60,
+        maxRounds: 5, // Default to 5 rounds
+        currentRoundNumber: 0,
+        totalScores: {},
         playerMap: {
           [user.uid]: {
             name,

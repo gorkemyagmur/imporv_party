@@ -7,10 +7,14 @@ export default function RatingPanel({
   ratings,
   onRatingChange,
   onSubmit,
+  currentUserId,
 }) {
+  // Filter out current user from performers to rate (users can't rate themselves)
+  const performersToRate = performers.filter((p) => p.id !== currentUserId);
+  
   const isReady = useMemo(() => {
-    return performers.every((performer) => !!ratings[performer.id]);
-  }, [performers, ratings]);
+    return performersToRate.every((performer) => !!ratings[performer.id]);
+  }, [performersToRate, ratings]);
 
   return (
     <section className="space-y-4 rounded-3xl bg-white/10 p-5 shadow-lg">
@@ -21,7 +25,7 @@ export default function RatingPanel({
         </span>
       </div>
 
-      {performers.map((performer) => (
+      {performersToRate.map((performer) => (
         <div
           key={performer.id}
           className="rounded-2xl border border-white/5 bg-white/5 p-4"
