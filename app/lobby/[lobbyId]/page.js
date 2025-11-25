@@ -310,11 +310,14 @@ export default function LobbyPage() {
   async function handleStartRound() {
     // Only host can start rounds
     const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
-    if (!userIsHost || players.length < 2 || currentRound || !lobbyId || !currentUser) {
+    // Check if round is active (not in results or idle state)
+    const isRoundActive = lobby?.status === "countdown" || lobby?.status === "rating";
+    if (!userIsHost || players.length < 2 || isRoundActive || !lobbyId || !currentUser) {
       console.log("Cannot start round:", {
         userIsHost,
         playersCount: players.length,
-        currentRound: !!currentRound,
+        isRoundActive,
+        lobbyStatus: lobby?.status,
         lobbyId,
         currentUser: !!currentUser,
       });
@@ -365,16 +368,16 @@ export default function LobbyPage() {
     }
   }
 
-  async function handleMaxRoundsChange(maxRounds) {
+  async function handleMaxRoundsChange(maxRoundsPerPlayer) {
     const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
     if (!userIsHost || !lobbyId || isRoundActive) return;
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
       await updateDoc(lobbyRef, {
-        maxRounds: maxRounds,
+        maxRoundsPerPlayer: maxRoundsPerPlayer,
       });
     } catch (err) {
-      console.error("Error updating max rounds:", err);
+      console.error("Error updating max rounds per player:", err);
     }
   }
 
@@ -431,90 +434,110 @@ export default function LobbyPage() {
       return;
     }
 
-    // Get all ratings from Firestore (not just current user's ratings)
-    const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
-    const roundSnap = await getDoc(roundRef);
-    if (!roundSnap.exists()) return;
-    
-    const roundData = roundSnap.data();
-    const allRatings = roundData.ratings || {};
-
-    // Calculate average scores for each performer from all ratings
-    const scores = {};
-    currentRound.performers.forEach((performer) => {
-      const performerRatings = [];
-      // Collect all ratings for this performer (excluding self-ratings)
-      Object.keys(allRatings).forEach((raterId) => {
-        if (raterId !== performer.id && allRatings[raterId]?.[performer.id]) {
-          performerRatings.push(allRatings[raterId][performer.id]);
-        }
-      });
-      
-      // Calculate average
-      if (performerRatings.length > 0) {
-        const sum = performerRatings.reduce((acc, val) => acc + val, 0);
-        scores[performer.id] = sum / performerRatings.length;
-      } else {
-        scores[performer.id] = 0;
-      }
-    });
-
-    // Find winner(s) - only if there's a clear winner (no ties)
-    const sortedPerformers = [...currentRound.performers].sort((a, b) => {
-      return (scores[b.id] ?? 0) - (scores[a.id] ?? 0);
-    });
-    
-    let winnerId = null;
-    let winnerName = null;
-    
-    // Only set winner if there's a clear winner (highest score is unique)
-    if (sortedPerformers.length > 0) {
-      const highestScore = scores[sortedPerformers[0].id];
-      const winnersWithHighestScore = sortedPerformers.filter(
-        (p) => scores[p.id] === highestScore
-      );
-      
-      // Only set winner if exactly one player has the highest score
-      if (winnersWithHighestScore.length === 1) {
-        winnerId = sortedPerformers[0].id;
-        winnerName = sortedPerformers[0].name;
-      }
+    // Check if user is a performer
+    const isPerformer = currentRound.performers.some((p) => p.id === currentUser.uid);
+    if (!isPerformer) {
+      return;
     }
 
     try {
-      // Update round with scores
+      const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+      
+      // Mark this user's ratings as submitted
       await updateDoc(roundRef, {
-        status: "results",
-        scores,
-        winnerId: winnerId,
-        winnerName: winnerName,
+        [`submittedRatings.${currentUser.uid}`]: true,
       });
 
-      // Update lobby status
-      const lobbyRef = doc(db, "lobbies", lobbyId);
-      const lobbySnap = await getDoc(lobbyRef);
-      const lobbyData = lobbySnap.data();
+      // Check if all performers have submitted
+      const roundSnap = await getDoc(roundRef);
+      if (!roundSnap.exists()) return;
       
-      // Update total scores in lobby
-      const currentTotalScores = lobbyData.totalScores || {};
-      const updatedTotalScores = { ...currentTotalScores };
-      
-      currentRound.performers.forEach((performer) => {
-        if (!updatedTotalScores[performer.id]) {
-          updatedTotalScores[performer.id] = {
-            name: performer.name,
-            totalScore: 0,
-            roundsPlayed: 0,
-          };
+      const roundData = roundSnap.data();
+      const submittedRatings = roundData.submittedRatings || {};
+      const allPerformersSubmitted = currentRound.performers.every(
+        (performer) => submittedRatings[performer.id]
+      );
+
+      // If all performers submitted, calculate scores and move to results
+      if (allPerformersSubmitted) {
+        const allRatings = roundData.ratings || {};
+
+        // Calculate average scores for each performer from all ratings
+        const scores = {};
+        currentRound.performers.forEach((performer) => {
+          const performerRatings = [];
+          // Collect all ratings for this performer (excluding self-ratings)
+          Object.keys(allRatings).forEach((raterId) => {
+            if (raterId !== performer.id && allRatings[raterId]?.[performer.id]) {
+              performerRatings.push(allRatings[raterId][performer.id]);
+            }
+          });
+          
+          // Calculate average
+          if (performerRatings.length > 0) {
+            const sum = performerRatings.reduce((acc, val) => acc + val, 0);
+            scores[performer.id] = sum / performerRatings.length;
+          } else {
+            scores[performer.id] = 0;
+          }
+        });
+
+        // Find winner(s) - only if there's a clear winner (no ties)
+        const sortedPerformers = [...currentRound.performers].sort((a, b) => {
+          return (scores[b.id] ?? 0) - (scores[a.id] ?? 0);
+        });
+        
+        let winnerId = null;
+        let winnerName = null;
+        
+        // Only set winner if there's a clear winner (highest score is unique)
+        if (sortedPerformers.length > 0) {
+          const highestScore = scores[sortedPerformers[0].id];
+          const winnersWithHighestScore = sortedPerformers.filter(
+            (p) => scores[p.id] === highestScore
+          );
+          
+          // Only set winner if exactly one player has the highest score
+          if (winnersWithHighestScore.length === 1) {
+            winnerId = sortedPerformers[0].id;
+            winnerName = sortedPerformers[0].name;
+          }
         }
-        updatedTotalScores[performer.id].totalScore += scores[performer.id] || 0;
-        updatedTotalScores[performer.id].roundsPlayed += 1;
-      });
 
-      await updateDoc(lobbyRef, {
-        status: "results",
-        totalScores: updatedTotalScores,
-      });
+        // Update round with scores
+        await updateDoc(roundRef, {
+          status: "results",
+          scores,
+          winnerId: winnerId,
+          winnerName: winnerName,
+        });
+
+        // Update lobby status
+        const lobbyRef = doc(db, "lobbies", lobbyId);
+        const lobbySnap = await getDoc(lobbyRef);
+        const lobbyData = lobbySnap.data();
+        
+        // Update total scores in lobby
+        const currentTotalScores = lobbyData.totalScores || {};
+        const updatedTotalScores = { ...currentTotalScores };
+        
+        currentRound.performers.forEach((performer) => {
+          if (!updatedTotalScores[performer.id]) {
+            updatedTotalScores[performer.id] = {
+              name: performer.name,
+              totalScore: 0,
+              roundsPlayed: 0,
+            };
+          }
+          updatedTotalScores[performer.id].totalScore += scores[performer.id] || 0;
+          updatedTotalScores[performer.id].roundsPlayed += 1;
+        });
+
+        await updateDoc(lobbyRef, {
+          status: "results",
+          totalScores: updatedTotalScores,
+        });
+      }
     } catch (err) {
       console.error("Error submitting ratings:", err);
     }
@@ -526,11 +549,16 @@ export default function LobbyPage() {
     
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
-      const currentRoundNumber = lobby.currentRoundNumber || 0;
-      const maxRounds = lobby.maxRounds || 999; // Default to unlimited
+      const maxRoundsPerPlayer = lobby.maxRoundsPerPlayer || 3;
+      const totalScores = lobby.totalScores || {};
       
-      // Check if game is finished
-      if (currentRoundNumber >= maxRounds) {
+      // Check if all players have reached max rounds per player
+      const allPlayersFinished = players.every((player) => {
+        const playerRounds = totalScores[player.id]?.roundsPlayed || 0;
+        return playerRounds >= maxRoundsPerPlayer;
+      });
+      
+      if (allPlayersFinished) {
         await updateDoc(lobbyRef, {
           status: "finished",
           currentRoundId: null,
@@ -540,12 +568,11 @@ export default function LobbyPage() {
         return;
       }
       
-      // Increment round number
+      // Just reset status, round number will be incremented when next round starts
       await updateDoc(lobbyRef, {
         status: "idle",
         currentRoundId: null,
         startedAt: null,
-        currentRoundNumber: currentRoundNumber + 1,
       });
       setRatings({});
     } catch (err) {
@@ -574,7 +601,7 @@ export default function LobbyPage() {
               </h1>
               {lobby && (lobby.currentRoundNumber > 0 || isRoundActive) && (
                 <p className="mt-1 text-sm text-purple-200">
-                  Round {lobby.currentRoundNumber || 0} / {lobby.maxRounds || 5}
+                  Round {lobby.currentRoundNumber || 0}
                 </p>
               )}
             </div>
@@ -664,7 +691,7 @@ export default function LobbyPage() {
               <>
                 <DurationSelector value={duration} onChange={handleDurationChange} />
                 <MaxRoundsSelector 
-                  value={lobby?.maxRounds || 5} 
+                  value={lobby?.maxRoundsPerPlayer || 3} 
                   onChange={handleMaxRoundsChange}
                   disabled={lobby?.currentRoundNumber > 0}
                 />
@@ -704,13 +731,22 @@ export default function LobbyPage() {
               description={currentRound.scenario.description}
             />
             <div className="grid gap-4 sm:grid-cols-3">
-              {currentRound.performers.map((performer) => (
-                <PerformerRoleCard
-                  key={performer.id}
-                  name={performer.name}
-                  role={currentRound.roles[performer.id]}
-                />
-              ))}
+              {currentRound.performers.map((performer) => {
+                const isCurrentUser = performer.id === currentUser?.uid;
+                // Show all performers to non-performers, only own role to performers
+                if (!isCurrentUser && currentRound.performers.some((p) => p.id === currentUser?.uid)) {
+                  return null; // Hide other performers' roles from current performer
+                }
+                return (
+                  <PerformerRoleCard
+                    key={performer.id}
+                    name={performer.name}
+                    role={currentRound.roles[performer.id]}
+                    performerId={performer.id}
+                    currentUserId={currentUser?.uid || null}
+                  />
+                );
+              })}
             </div>
 
             {phase === "countdown" && (
@@ -719,6 +755,7 @@ export default function LobbyPage() {
                 duration={currentRound.duration || duration}
                 isActive={phase === "countdown"}
                 onFinish={handleCountdownFinish}
+                startedAt={currentRound.startedAt}
               />
             )}
 
@@ -729,6 +766,8 @@ export default function LobbyPage() {
                 onRatingChange={handleRatingChange}
                 onSubmit={handleSubmitRatings}
                 currentUserId={currentUser?.uid || null}
+                submittedRatings={currentRound.submittedRatings || {}}
+                isPerformer={currentRound.performers.some((p) => p.id === currentUser?.uid)}
               />
             )}
 
@@ -740,6 +779,7 @@ export default function LobbyPage() {
                 onNextRound={handleNextRound}
                 totalScores={lobby?.totalScores || {}}
                 allPlayers={players}
+                isHost={isHost}
               />
             )}
           </section>

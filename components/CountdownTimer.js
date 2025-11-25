@@ -12,29 +12,37 @@ export default function CountdownTimer({
   duration = 90,
   isActive,
   onFinish,
+  startedAt,
 }) {
   const [timeLeft, setTimeLeft] = useState(duration);
 
+  // Calculate time left from Firebase timestamp
   useEffect(() => {
-    if (!isActive) {
-      return undefined;
-    }
-    if (timeLeft <= 0) {
-      return undefined;
+    if (!isActive || !startedAt) {
+      setTimeLeft(duration);
+      return;
     }
 
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const updateTimeLeft = () => {
+      const now = Date.now();
+      const startTime = startedAt?.toMillis ? startedAt.toMillis() : (startedAt?.seconds * 1000) || now;
+      const elapsed = Math.floor((now - startTime) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+      setTimeLeft(remaining);
+      
+      if (remaining <= 0) {
+        onFinish?.();
+      }
+    };
+
+    // Update immediately
+    updateTimeLeft();
+
+    // Update every second
+    const interval = setInterval(updateTimeLeft, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive, startedAt, duration, onFinish]);
 
   useEffect(() => {
     if (!isActive) {

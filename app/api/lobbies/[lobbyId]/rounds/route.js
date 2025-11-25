@@ -128,6 +128,16 @@ export async function POST(request, { params }) {
       );
     }
 
+    // Get player round counts from totalScores to ensure equal distribution
+    const totalScores = lobbyData.totalScores || {};
+    const playerRoundCounts = players.map((p) => ({
+      ...p,
+      roundsPlayed: totalScores[p.id]?.roundsPlayed || 0,
+    }));
+
+    // Sort players by rounds played (ascending) to prioritize those who played less
+    playerRoundCounts.sort((a, b) => a.roundsPlayed - b.roundsPlayed);
+
     // Select scenario and performers
     const eligibleScenarios = SCENARIOS.filter(
       (scene) => scene.performers <= players.length
@@ -142,7 +152,18 @@ export async function POST(request, { params }) {
       3
     );
 
-    const performers = getRandomItems(players, performerCount);
+    // Select performers prioritizing those who played fewer rounds
+    // First, get players with minimum rounds played
+    const minRounds = playerRoundCounts[0].roundsPlayed;
+    const availablePlayers = playerRoundCounts.filter(
+      (p) => p.roundsPlayed === minRounds
+    );
+    
+    // If we have enough players with min rounds, select from them
+    // Otherwise, select from all players but prioritize those with fewer rounds
+    const performers = availablePlayers.length >= performerCount
+      ? getRandomItems(availablePlayers, performerCount)
+      : getRandomItems(playerRoundCounts, performerCount);
     const rolesSelection = getRandomItems(ROLES, performers.length);
     const roleMap = performers.reduce((acc, performer, index) => {
       acc[performer.id] = rolesSelection[index];

@@ -61,7 +61,7 @@ function HomeContent() {
         currentRoundId: null,
         startedAt: null,
         roundDuration: 60,
-        maxRounds: 5, // Default to 5 rounds
+        maxRoundsPerPlayer: 3, // Default to 3 rounds per player
         currentRoundNumber: 0,
         totalScores: {},
         playerMap: {
@@ -109,6 +109,12 @@ function HomeContent() {
       // Check if lobby is closed
       if (lobbyData.closed) {
         setJoinError("This lobby is closed.");
+        return;
+      }
+
+      // Check if round is in progress
+      if (lobbyData.status === "countdown" || lobbyData.status === "rating") {
+        setJoinError("Oyun devam ederken lobiye giriş yapılamaz. Lütfen round bitene kadar bekleyin.");
         return;
       }
 

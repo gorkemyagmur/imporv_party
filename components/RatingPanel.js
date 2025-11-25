@@ -8,13 +8,47 @@ export default function RatingPanel({
   onRatingChange,
   onSubmit,
   currentUserId,
+  submittedRatings,
+  isPerformer,
 }) {
+  // Check if current user has submitted
+  const hasSubmitted = submittedRatings?.[currentUserId] || false;
+  
   // Filter out current user from performers to rate (users can't rate themselves)
   const performersToRate = performers.filter((p) => p.id !== currentUserId);
   
   const isReady = useMemo(() => {
     return performersToRate.every((performer) => !!ratings[performer.id]);
   }, [performersToRate, ratings]);
+  
+  // If not a performer, show message
+  if (!isPerformer) {
+    return (
+      <section className="rounded-3xl bg-white/10 p-5 text-white shadow-lg text-center">
+        <p className="text-lg font-semibold mb-2">Watching the Round</p>
+        <p className="text-sm text-purple-100">
+          You're not performing in this round. Watch and wait for the performers to finish.
+        </p>
+      </section>
+    );
+  }
+  
+  // If already submitted, show waiting message
+  if (hasSubmitted) {
+    const allSubmitted = performers.every((p) => submittedRatings?.[p.id]);
+    return (
+      <section className="rounded-3xl bg-white/10 p-5 text-white shadow-lg text-center">
+        <p className="text-lg font-semibold mb-2">
+          {allSubmitted ? "All ratings submitted!" : "Diğer Oyuncuların Oy Verme İşlemi Devam Ediyor"}
+        </p>
+        <p className="text-sm text-purple-100">
+          {allSubmitted 
+            ? "Waiting for results..." 
+            : "Please wait while other performers submit their ratings."}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-4 rounded-3xl bg-white/10 p-5 shadow-lg">
