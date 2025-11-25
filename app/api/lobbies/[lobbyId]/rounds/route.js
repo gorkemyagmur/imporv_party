@@ -227,6 +227,14 @@ export async function POST(request, { params }) {
       });
     }
     
+    // Check if all rounds are completed
+    if (currentRoundNumber >= roundPlan.length) {
+      return NextResponse.json(
+        { error: "All rounds completed" },
+        { status: 400 }
+      );
+    }
+    
     // Get performers for current round from plan
     const currentRoundPlan = roundPlan[currentRoundNumber];
     if (!currentRoundPlan) {

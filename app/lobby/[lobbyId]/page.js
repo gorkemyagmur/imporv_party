@@ -22,6 +22,7 @@ import PlayerList from "@/components/PlayerList";
 import RatingPanel from "@/components/RatingPanel";
 import RoundResults from "@/components/RoundResults";
 import ScenarioCard from "@/components/ScenarioCard";
+import GameCompleteModal from "@/components/GameCompleteModal";
 
 export default function LobbyPage() {
   const params = useParams();
@@ -39,6 +40,7 @@ export default function LobbyPage() {
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const [userPendingRequest, setUserPendingRequest] = useState(null);
   const [wasInLobby, setWasInLobby] = useState(false);
+  const [showGameCompleteModal, setShowGameCompleteModal] = useState(false);
 
   const lobbyCode = (lobbyId || "").toUpperCase();
   const isRoundActive = Boolean(currentRound);
@@ -74,13 +76,17 @@ export default function LobbyPage() {
           setCurrentRound(null);
           setRatings({});
         }
+        // Show game complete modal if game is finished
+        if (data.status === "finished" && !showGameCompleteModal) {
+          setShowGameCompleteModal(true);
+        }
       } else {
         // Lobby doesn't exist, redirect to home
         router.push("/");
       }
     });
     return () => unsubscribe();
-  }, [lobbyId, router]);
+  }, [lobbyId, router, showGameCompleteModal]);
 
   // Track if user was in lobby initially
   useEffect(() => {
@@ -538,22 +544,19 @@ export default function LobbyPage() {
     
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
-      const maxRoundsPerPlayer = lobby.maxRoundsPerPlayer || 3;
-      const totalScores = lobby.totalScores || {};
+      const currentRoundNumber = lobby.currentRoundNumber || 0;
+      const totalRounds = lobby.totalRounds || 0;
       
-      // Check if all players have reached max rounds per player
-      const allPlayersFinished = players.every((player) => {
-        const playerRounds = totalScores[player.id]?.roundsPlayed || 0;
-        return playerRounds >= maxRoundsPerPlayer;
-      });
-      
-      if (allPlayersFinished) {
+      // Check if all rounds in the plan are completed
+      if (currentRoundNumber >= totalRounds && totalRounds > 0) {
+        // Game is complete
         await updateDoc(lobbyRef, {
           status: "finished",
           currentRoundId: null,
           startedAt: null,
         });
         setRatings({});
+        setShowGameCompleteModal(true);
         return;
       }
       
@@ -566,6 +569,32 @@ export default function LobbyPage() {
       setRatings({});
     } catch (err) {
       console.error("Error starting next round:", err);
+    }
+  }
+
+  async function handleStartNewGame() {
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId || !lobby) return;
+    
+    try {
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      
+      // Reset game state for new game
+      await updateDoc(lobbyRef, {
+        status: "idle",
+        currentRoundId: null,
+        currentRoundNumber: 0,
+        totalRounds: 0,
+        roundPlan: null,
+        totalScores: {},
+        startedAt: null,
+      });
+      
+      setShowGameCompleteModal(false);
+      setRatings({});
+      setCurrentRound(null);
+    } catch (err) {
+      console.error("Error starting new game:", err);
     }
   }
 
@@ -821,6 +850,18 @@ export default function LobbyPage() {
           </div>
         </div>
       )}
+
+      {/* Game Complete Modal */}
+      <GameCompleteModal
+        isOpen={showGameCompleteModal}
+        onClose={() => setShowGameCompleteModal(false)}
+        totalScores={lobby?.totalScores || {}}
+        allPlayers={players}
+        lobbyId={lobbyId}
+        currentUserId={currentUser?.uid || null}
+        onStartNewGame={handleStartNewGame}
+        isHost={isHost}
+      />
     </main>
   );
 }
