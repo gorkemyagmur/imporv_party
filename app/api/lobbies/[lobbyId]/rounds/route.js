@@ -76,7 +76,7 @@ export async function POST(request, { params }) {
       );
     }
 
-    const { lobbyId } = params;
+    const { lobbyId } = await params;
     const body = await request.json();
     const { duration, userId } = body;
 

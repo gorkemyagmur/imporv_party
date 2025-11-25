@@ -265,7 +265,8 @@ export default function LobbyPage() {
 
   async function handleRemovePlayer(playerId) {
     // Only host can remove players
-    if (!isHost || !lobbyId) return;
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId) return;
 
     try {
       const playerRef = doc(db, "lobbies", lobbyId, "players", playerId);
@@ -283,7 +284,8 @@ export default function LobbyPage() {
 
   async function handleCloseLobby() {
     // Only host can close lobby
-    if (!isHost || !lobbyId) return;
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || !lobbyId) return;
 
     try {
       const lobbyRef = doc(db, "lobbies", lobbyId);
@@ -300,11 +302,20 @@ export default function LobbyPage() {
 
   async function handleStartRound() {
     // Only host can start rounds
-    if (!isHost || players.length < 2 || currentRound || !lobbyId || !currentUser) {
+    const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+    if (!userIsHost || players.length < 2 || currentRound || !lobbyId || !currentUser) {
+      console.log("Cannot start round:", {
+        userIsHost,
+        playersCount: players.length,
+        currentRound: !!currentRound,
+        lobbyId,
+        currentUser: !!currentUser,
+      });
       return;
     }
 
     try {
+      console.log("Starting round with:", { lobbyId, duration, userId: currentUser.uid });
       const response = await fetch(`/api/lobbies/${lobbyId}/rounds`, {
         method: "POST",
         headers: {
@@ -319,13 +330,17 @@ export default function LobbyPage() {
       if (!response.ok) {
         const error = await response.json();
         console.error("Error starting round:", error);
+        alert(`Error starting round: ${error.error || "Unknown error"}`);
         return;
       }
 
+      const result = await response.json();
+      console.log("Round started successfully:", result);
       // Round will be created by API, real-time listener will pick it up
       setRatings({});
     } catch (err) {
       console.error("Error starting round:", err);
+      alert(`Error starting round: ${err.message || "Please try again"}`);
     }
   }
 
@@ -427,9 +442,9 @@ export default function LobbyPage() {
 
   const phase = currentRound?.status ?? "idle";
 
-  const canStartRound = players.length >= 2 && !isRoundActive && isHost;
-  const isUserInLobby = currentUser && players.some((p) => p.id === currentUser.uid);
   const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
+  const canStartRound = players.length >= 2 && !isRoundActive && userIsHost;
+  const isUserInLobby = currentUser && players.some((p) => p.id === currentUser.uid);
   const isWaitingForApproval = !userIsHost && !isUserInLobby && userPendingRequest && (userPendingRequest.status === "pending" || !userPendingRequest.status);
 
   return (
