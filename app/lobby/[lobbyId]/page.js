@@ -78,7 +78,12 @@ export default function LobbyPage() {
         }
         // Show game complete modal if game is finished
         if (data.status === "finished") {
+          setCurrentRound(null); // Clear current round when game is finished
+          setRatings({});
           setShowGameCompleteModal(true);
+        } else {
+          // Reset modal state when game is not finished
+          setShowGameCompleteModal(false);
         }
       } else {
         // Lobby doesn't exist, redirect to home
@@ -545,6 +550,7 @@ export default function LobbyPage() {
           startedAt: null,
         });
         setRatings({});
+        setCurrentRound(null); // Clear current round immediately
         setShowGameCompleteModal(true);
         return;
       }
@@ -741,7 +747,7 @@ export default function LobbyPage() {
             )}
 
             {/* Show "Yeni Oyun Başlat" button for admin when game is finished */}
-            {isHost && lobby?.status === "finished" && !showGameCompleteModal && (
+            {isHost && lobby?.status === "finished" && (
               <button
                 onClick={handleStartNewGame}
                 className="rounded-3xl bg-gradient-to-r from-teal-400 to-emerald-400 px-6 py-5 text-xl font-semibold text-black shadow-xl shadow-emerald-400/40 transition active:scale-[0.99]"
@@ -758,7 +764,7 @@ export default function LobbyPage() {
           </p>
         )}
 
-        {isRoundActive && (
+        {isRoundActive && lobby?.status !== "finished" && (
           <section className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5">
             <ScenarioCard
               title={currentRound.scenario.title}
