@@ -5,6 +5,7 @@ export default function PlayerList({
   onAddPlayer,
   onRemovePlayer,
   isFull,
+  isHost = false,
 }) {
   return (
     <section className="rounded-3xl bg-white/10 p-5 shadow-lg shadow-black/40">
@@ -25,14 +26,21 @@ export default function PlayerList({
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-pink-500/70 via-purple-500/70 to-indigo-500/70 text-base font-semibold text-white">
                 {player.name.slice(0, 2).toUpperCase()}
               </span>
-              <p className="text-base font-medium text-white">{player.name}</p>
+              <div>
+                <p className="text-base font-medium text-white">{player.name}</p>
+                {isHost && player.id === players.find((p) => p.isHost)?.id && (
+                  <p className="text-xs text-amber-300">Host</p>
+                )}
+              </div>
             </div>
-            <button
-              onClick={() => onRemovePlayer(player.id)}
-              className="text-sm font-medium text-pink-200 underline decoration-dotted"
-            >
-              Remove
-            </button>
+            {isHost && (
+              <button
+                onClick={() => onRemovePlayer(player.id)}
+                className="text-sm font-medium text-pink-200 underline decoration-dotted"
+              >
+                Remove
+              </button>
+            )}
           </li>
         ))}
         {players.length === 0 && (

@@ -1,7 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import CountdownTimer from "@/components/CountdownTimer";
 import DurationSelector from "@/components/DurationSelector";
 import PerformerRoleCard from "@/components/PerformerRoleCard";
@@ -84,91 +95,274 @@ export default function LobbyPage() {
   const [playerName, setPlayerName] = useState("");
   const [currentRound, setCurrentRound] = useState(null);
   const [ratings, setRatings] = useState({});
-  const [history, setHistory] = useState([]);
   const [duration, setDuration] = useState(60);
+  const [lobby, setLobby] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const lobbyCode = (lobbyId || "").toUpperCase();
   const isRoundActive = Boolean(currentRound);
+  const isHost = currentUser && lobby && currentUser.uid === lobby.hostId;
 
   const lobbyIsFull = players.length >= 6;
 
-  function handleAddPlayer(event) {
+  // Firebase auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to lobby document
+  useEffect(() => {
+    if (!lobbyId) return;
+    const lobbyRef = doc(db, "lobbies", lobbyId);
+    const unsubscribe = onSnapshot(lobbyRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setLobby(data);
+        setDuration(data.roundDuration || 60);
+        // Reset round if no currentRoundId
+        if (!data.currentRoundId) {
+          setCurrentRound(null);
+          setRatings({});
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [lobbyId]);
+
+  // Listen to players subcollection
+  useEffect(() => {
+    if (!lobbyId) return;
+    const playersRef = collection(db, "lobbies", lobbyId, "players");
+    const unsubscribe = onSnapshot(playersRef, (snap) => {
+      const playersList = snap.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setPlayers(playersList);
+    });
+    return () => unsubscribe();
+  }, [lobbyId]);
+
+  // Listen to current round
+  useEffect(() => {
+    if (!lobbyId || !lobby?.currentRoundId) {
+      return;
+    }
+    const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+    const unsubscribe = onSnapshot(roundRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCurrentRound({
+          id: snap.id,
+          ...data,
+        });
+        // Load current user's ratings
+        if (currentUser && data.ratings?.[currentUser.uid]) {
+          setRatings(data.ratings[currentUser.uid]);
+        } else {
+          setRatings({});
+        }
+      } else {
+        setCurrentRound(null);
+        setRatings({});
+      }
+    });
+    return () => unsubscribe();
+  }, [lobbyId, lobby?.currentRoundId, currentUser]);
+
+  async function handleAddPlayer(event) {
     event?.preventDefault();
     const trimmed = playerName.trim();
-    if (!trimmed || lobbyIsFull) {
+    if (!trimmed || lobbyIsFull || !currentUser || !lobbyId) {
       return;
     }
 
-    setPlayers((prev) => [
-      ...prev,
-      {
-        id: randomId("player"),
+    // Check if current user is already in the list
+    const existingPlayer = players.find((p) => p.id === currentUser.uid);
+    if (existingPlayer) {
+      // User already in list, just update their name
+      try {
+        const playerRef = doc(db, "lobbies", lobbyId, "players", currentUser.uid);
+        await setDoc(
+          playerRef,
+          {
+            name: trimmed,
+            joinedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        // Update playerMap in lobby document
+        const lobbyRef = doc(db, "lobbies", lobbyId);
+        await updateDoc(lobbyRef, {
+          [`playerMap.${currentUser.uid}`]: {
+            name: trimmed,
+            joinedAt: serverTimestamp(),
+          },
+        });
+
+        setPlayerName("");
+      } catch (err) {
+        console.error("Error updating player:", err);
+      }
+      return;
+    }
+
+    // New player - add them to the list
+    try {
+      const playerRef = doc(db, "lobbies", lobbyId, "players", currentUser.uid);
+      await setDoc(playerRef, {
         name: trimmed,
-      },
-      ]);
-    setPlayerName("");
+        joinedAt: serverTimestamp(),
+      });
+
+      // Update playerMap in lobby document
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        [`playerMap.${currentUser.uid}`]: {
+          name: trimmed,
+          joinedAt: serverTimestamp(),
+        },
+      });
+
+      setPlayerName("");
+    } catch (err) {
+      console.error("Error adding player:", err);
+    }
   }
 
-  function handleRemovePlayer(playerId) {
-    setPlayers((prev) => prev.filter((player) => player.id !== playerId));
-    setRatings((prev) => {
-      const updated = { ...prev };
-      delete updated[playerId];
-      return updated;
-    });
+  async function handleRemovePlayer(playerId) {
+    // Only host can remove players
+    if (!isHost || !lobbyId) return;
+
+    try {
+      const playerRef = doc(db, "lobbies", lobbyId, "players", playerId);
+      await deleteDoc(playerRef);
+
+      // Update playerMap in lobby document
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        [`playerMap.${playerId}`]: null,
+      });
+    } catch (err) {
+      console.error("Error removing player:", err);
+    }
   }
 
-  function handleStartRound() {
-    if (players.length < 2 || currentRound) {
+  async function handleStartRound() {
+    // Only host can start rounds
+    if (!isHost || players.length < 2 || currentRound || !lobbyId) {
       return;
     }
 
-    const eligibleScenarios = SCENARIOS.filter(
-      (scene) => scene.performers <= players.length
-    );
-    const scenarioPool =
-      eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
-    const scenario =
-      scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
-    const performerCount = Math.min(
-      scenario.performers ?? (Math.random() > 0.5 ? 3 : 2),
-      players.length,
-      3
-    );
+    try {
+      const eligibleScenarios = SCENARIOS.filter(
+        (scene) => scene.performers <= players.length
+      );
+      const scenarioPool =
+        eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
+      const scenario =
+        scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
+      const performerCount = Math.min(
+        scenario.performers ?? (Math.random() > 0.5 ? 3 : 2),
+        players.length,
+        3
+      );
 
-    const performers = getRandomItems(players, performerCount);
-    const rolesSelection = getRandomItems(ROLES, performers.length);
-    const roleMap = performers.reduce((acc, performer, index) => {
-      acc[performer.id] = rolesSelection[index];
-      return acc;
-    }, {});
+      const performers = getRandomItems(players, performerCount);
+      const rolesSelection = getRandomItems(ROLES, performers.length);
+      const roleMap = performers.reduce((acc, performer, index) => {
+        acc[performer.id] = rolesSelection[index];
+        return acc;
+      }, {});
 
-    // TODO: Replace random scenario/role logic with an AI-generated prompt or remote service.
-    setCurrentRound({
-      id: randomId("round"),
-      performers,
-      scenario,
-      roles: roleMap,
-      status: "countdown",
-      scores: {},
-      duration,
-    });
-    setRatings({});
+      const roundId = randomId("round");
+
+      // Create round document
+      const roundRef = doc(db, "lobbies", lobbyId, "rounds", roundId);
+      await setDoc(roundRef, {
+        scenario: {
+          title: scenario.title,
+          description: scenario.description,
+        },
+        performers: performers.map((p) => ({ id: p.id, name: p.name })),
+        roles: roleMap,
+        status: "countdown",
+        duration,
+        startedAt: serverTimestamp(),
+        scores: {},
+      });
+
+      // Update lobby document
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        status: "countdown",
+        currentRoundId: roundId,
+        startedAt: serverTimestamp(),
+        roundDuration: duration,
+      });
+
+      setRatings({});
+    } catch (err) {
+      console.error("Error starting round:", err);
+    }
   }
 
-  function handleCountdownFinish() {
-    setCurrentRound((prev) => (prev ? { ...prev, status: "rating" } : prev));
+  async function handleDurationChange(newDuration) {
+    if (!isHost || !lobbyId || isRoundActive) return;
+    try {
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        roundDuration: newDuration,
+      });
+      setDuration(newDuration);
+    } catch (err) {
+      console.error("Error updating duration:", err);
+    }
   }
 
-  function handleRatingChange(performerId, value) {
-    setRatings((prev) => ({ ...prev, [performerId]: value }));
+  async function handleCountdownFinish() {
+    if (!lobbyId || !lobby?.currentRoundId) return;
+    try {
+      const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+      await updateDoc(roundRef, {
+        status: "rating",
+      });
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        status: "rating",
+      });
+    } catch (err) {
+      console.error("Error finishing countdown:", err);
+    }
   }
 
-  function handleSubmitRatings() {
-    if (!currentRound) {
+
+  async function handleRatingChange(performerId, value) {
+    if (!currentUser || !lobbyId || !lobby?.currentRoundId) return;
+    try {
+      const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+      await updateDoc(roundRef, {
+        [`ratings.${currentUser.uid}.${performerId}`]: value,
+      });
+      setRatings((prev) => ({ ...prev, [performerId]: value }));
+    } catch (err) {
+      console.error("Error updating rating:", err);
+    }
+  }
+
+  async function handleSubmitRatings() {
+    if (!currentRound || !lobbyId || !lobby?.currentRoundId) {
       return;
     }
 
+    // Calculate scores from all ratings
+    // This should ideally be done server-side, but for now we'll calculate client-side
     const scores = currentRound.performers.reduce((acc, performer) => {
       acc[performer.id] = ratings[performer.id] ?? 0;
       return acc;
@@ -182,39 +376,42 @@ export default function LobbyPage() {
       return a.name.localeCompare(b.name);
     })[0];
 
-    setHistory((prev) => [
-      {
-        roundId: currentRound.id,
+    try {
+      const roundRef = doc(db, "lobbies", lobbyId, "rounds", lobby.currentRoundId);
+      await updateDoc(roundRef, {
+        status: "results",
+        scores,
         winnerId: winner.id,
         winnerName: winner.name,
-        scores,
-      },
-      ...prev,
-    ]);
+      });
 
-    setCurrentRound((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: "results",
-            scores,
-            winnerId: winner.id,
-          }
-        : prev
-    );
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        status: "results",
+      });
+    } catch (err) {
+      console.error("Error submitting ratings:", err);
+    }
   }
 
-  function handleNextRound() {
-    setCurrentRound(null);
-    setRatings({});
-    // TODO: Sync this action with a backend/WebSocket when multi-device support ships.
+  async function handleNextRound() {
+    if (!isHost || !lobbyId) return;
+    try {
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        status: "idle",
+        currentRoundId: null,
+        startedAt: null,
+      });
+      setRatings({});
+    } catch (err) {
+      console.error("Error starting next round:", err);
+    }
   }
 
   const phase = currentRound?.status ?? "idle";
 
-  const canStartRound = players.length >= 2 && !isRoundActive;
-
-  const activeHistory = useMemo(() => history.slice(0, 5), [history]);
+  const canStartRound = players.length >= 2 && !isRoundActive && isHost;
 
   return (
     <main className="min-h-screen px-4 pb-28 pt-8 sm:px-6">
@@ -231,26 +428,45 @@ export default function LobbyPage() {
           </div>
         </header>
 
-        <PlayerList
-          players={players}
-          playerName={playerName}
-          onPlayerNameChange={setPlayerName}
-          onAddPlayer={handleAddPlayer}
-          onRemovePlayer={handleRemovePlayer}
-          isFull={lobbyIsFull}
-        />
+        {loading ? (
+          <div className="rounded-3xl bg-white/10 p-5 text-center text-white">
+            Loading lobby...
+          </div>
+        ) : (
+          <>
+            <PlayerList
+              players={players}
+              playerName={playerName}
+              onPlayerNameChange={setPlayerName}
+              onAddPlayer={handleAddPlayer}
+              onRemovePlayer={handleRemovePlayer}
+              isFull={lobbyIsFull}
+              isHost={isHost}
+            />
 
-        {!isRoundActive && (
-          <DurationSelector value={duration} onChange={setDuration} />
+            {!isRoundActive && isHost && (
+              <DurationSelector value={duration} onChange={handleDurationChange} />
+            )}
+
+            {isHost && (
+              <button
+                onClick={handleStartRound}
+                disabled={!canStartRound}
+                className="rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 px-6 py-5 text-xl font-semibold text-white shadow-xl shadow-pink-500/40 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isRoundActive ? "Round in progress" : "Start new round"}
+              </button>
+            )}
+
+            {!isHost && (
+              <div className="rounded-3xl bg-white/10 p-5 text-center text-white">
+                <p className="text-sm text-purple-100">
+                  Waiting for host to start the round...
+                </p>
+              </div>
+            )}
+          </>
         )}
-
-        <button
-          onClick={handleStartRound}
-          disabled={!canStartRound}
-          className="rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 px-6 py-5 text-xl font-semibold text-white shadow-xl shadow-pink-500/40 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isRoundActive ? "Round in progress" : "Start new round"}
-        </button>
 
         {!isRoundActive && players.length < 2 && (
           <p className="text-sm text-purple-100">
@@ -303,40 +519,6 @@ export default function LobbyPage() {
           </section>
         )}
 
-        <section className="rounded-3xl border border-white/5 bg-white/5 p-5 text-white">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">History</h3>
-            <span className="text-sm text-purple-100">
-              {history.length} round{history.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          {activeHistory.length === 0 ? (
-            <p className="mt-4 text-sm text-purple-100">
-              Start a round to build your MVP timeline.
-            </p>
-          ) : (
-            <ul className="mt-4 space-y-3 text-sm">
-              {activeHistory.map((round) => (
-                <li
-                  key={round.roundId}
-                  className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3"
-                >
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-purple-200">
-                      Winner
-                    </p>
-                    <p className="text-base font-semibold">{round.winnerName}</p>
-                  </div>
-                  <p className="text-base font-bold text-amber-300">
-                    {typeof round.scores[round.winnerId] === "number"
-                      ? `${round.scores[round.winnerId].toFixed(1)} pts`
-                      : "--"}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       </div>
     </main>
   );
