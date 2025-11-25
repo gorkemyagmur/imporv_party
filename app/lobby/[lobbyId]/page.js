@@ -77,7 +77,7 @@ export default function LobbyPage() {
           setRatings({});
         }
         // Show game complete modal if game is finished
-        if (data.status === "finished" && !showGameCompleteModal) {
+        if (data.status === "finished") {
           setShowGameCompleteModal(true);
         }
       } else {
@@ -86,7 +86,7 @@ export default function LobbyPage() {
       }
     });
     return () => unsubscribe();
-  }, [lobbyId, router, showGameCompleteModal]);
+  }, [lobbyId, router]);
 
   // Track if user was in lobby initially
   useEffect(() => {
@@ -638,6 +638,23 @@ export default function LobbyPage() {
                   Close Lobby
                 </button>
               )}
+              {!isHost && (
+                <button
+                  onClick={async () => {
+                    if (!lobbyId || !currentUser) return;
+                    try {
+                      const playerRef = doc(db, "lobbies", lobbyId, "players", currentUser.uid);
+                      await deleteDoc(playerRef);
+                      router.push("/");
+                    } catch (err) {
+                      console.error("Error leaving lobby:", err);
+                    }
+                  }}
+                  className="rounded-full bg-gray-500/80 px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-500"
+                >
+                  Lobiyi Terk Et
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -726,12 +743,22 @@ export default function LobbyPage() {
               </button>
             )}
 
-            {!isHost && (
+            {!isHost && !isRoundActive && (
               <div className="rounded-3xl bg-white/10 p-5 text-center text-white">
                 <p className="text-sm text-purple-100">
-                  Waiting for host to start the round...
+                  {lobby?.currentRoundNumber > 0 ? "Rounds In progress" : "Waiting for host to start the round..."}
                 </p>
               </div>
+            )}
+
+            {/* Show "Yeni Oyun Başlat" button for admin when game is finished */}
+            {isHost && lobby?.status === "finished" && !showGameCompleteModal && (
+              <button
+                onClick={handleStartNewGame}
+                className="rounded-3xl bg-gradient-to-r from-teal-400 to-emerald-400 px-6 py-5 text-xl font-semibold text-black shadow-xl shadow-emerald-400/40 transition active:scale-[0.99]"
+              >
+                Yeni Oyun Başlat
+              </button>
             )}
           </>
         )}

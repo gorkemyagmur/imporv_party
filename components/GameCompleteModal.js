@@ -242,15 +242,6 @@ export default function GameCompleteModal({
             </div>
           )}
 
-          {/* Start New Game Button (Host only) - shown after feedback submission */}
-          {isHost && hasSubmitted && (
-            <button
-              onClick={onStartNewGame}
-              className="w-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-3 text-base font-semibold text-black shadow-lg shadow-emerald-400/40"
-            >
-              Yeni Oyun Başlat
-            </button>
-          )}
         </div>
       </div>
     </div>
