@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import {
@@ -29,7 +29,7 @@ async function ensureAnonUser() {
   return credential.user;
 }
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hostName, setHostName] = useState("");
@@ -266,5 +266,19 @@ export default function Home() {
         Built for phones • No accounts • Just pure improv energy
       </p>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen px-4 py-16">
+        <div className="mx-auto flex max-w-md flex-col items-center rounded-3xl bg-white/10 p-8 text-center shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
+          <p className="text-sm text-purple-100">Loading...</p>
+        </div>
+      </main>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
