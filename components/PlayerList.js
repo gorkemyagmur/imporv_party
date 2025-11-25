@@ -6,6 +6,7 @@ export default function PlayerList({
   onRemovePlayer,
   isFull,
   isHost = false,
+  currentUserId = null,
 }) {
   return (
     <section className="rounded-3xl bg-white/10 p-5 shadow-lg shadow-black/40">
@@ -33,7 +34,7 @@ export default function PlayerList({
                 )}
               </div>
             </div>
-            {isHost && (
+            {isHost && player.id !== currentUserId && (
               <button
                 onClick={() => onRemovePlayer(player.id)}
                 className="text-sm font-medium text-pink-200 underline decoration-dotted"

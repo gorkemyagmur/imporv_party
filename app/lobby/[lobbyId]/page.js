@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -21,75 +21,9 @@ import RatingPanel from "@/components/RatingPanel";
 import RoundResults from "@/components/RoundResults";
 import ScenarioCard from "@/components/ScenarioCard";
 
-const SCENARIOS = [
-  {
-    title: "Elevator Stand-off",
-    description:
-      "The lift jammed between floors. Only some of you can reach the emergency panel.",
-    performers: 2,
-  },
-  {
-    title: "Supermarket Showdown",
-    description:
-      "There’s one last legendary snack and multiple carts racing toward it.",
-    performers: 3,
-  },
-  {
-    title: "Missing Luggage Mayhem",
-    description:
-      "Your bags vanished at baggage claim. Blame and rumors fly everywhere.",
-    performers: 3,
-  },
-  {
-    title: "Apartment Argument",
-    description:
-      "Fed-up neighbors confront each other about the mysterious 3 a.m. noise.",
-    performers: 2,
-  },
-  {
-    title: "Arcade Rivalry",
-    description:
-      "Two gamers claim the crown on the retro machine while a judge mediates.",
-    performers: 3,
-  },
-  {
-    title: "Airport Upgrade Scheme",
-    description:
-      "Only a couple of passengers can be upgraded. Convince the gate agent.",
-    performers: 2,
-  },
-];
-
-const ROLES = [
-  "Overly dramatic about everything",
-  "Always apologizing for no reason",
-  "Conspiracy theorist",
-  "Speaks only in questions",
-  "Secret superhero who cannot reveal it",
-  "Mimics everyone else",
-  "DJ narrating the scene like a radio host",
-  "Hyper-competitive rival",
-];
-
-function randomId(prefix) {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
-}
-
-function getRandomItems(list, count) {
-  const pool = [...list];
-  const selected = [];
-  while (selected.length < count && pool.length) {
-    const index = Math.floor(Math.random() * pool.length);
-    selected.push(pool.splice(index, 1)[0]);
-  }
-  return selected;
-}
-
 export default function LobbyPage() {
   const params = useParams();
+  const router = useRouter();
   const lobbyId = (params?.lobbyId || "").toString();
   const [players, setPlayers] = useState([]);
   const [playerName, setPlayerName] = useState("");
@@ -122,6 +56,11 @@ export default function LobbyPage() {
     const unsubscribe = onSnapshot(lobbyRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        // Check if lobby is closed
+        if (data.closed) {
+          router.push("/");
+          return;
+        }
         setLobby(data);
         setDuration(data.roundDuration || 60);
         // Reset round if no currentRoundId
@@ -129,14 +68,17 @@ export default function LobbyPage() {
           setCurrentRound(null);
           setRatings({});
         }
+      } else {
+        // Lobby doesn't exist, redirect to home
+        router.push("/");
       }
     });
     return () => unsubscribe();
-  }, [lobbyId]);
+  }, [lobbyId, router]);
 
   // Listen to players subcollection
   useEffect(() => {
-    if (!lobbyId) return;
+    if (!lobbyId || !currentUser) return;
     const playersRef = collection(db, "lobbies", lobbyId, "players");
     const unsubscribe = onSnapshot(playersRef, (snap) => {
       const playersList = snap.docs.map((docSnap) => ({
@@ -144,9 +86,16 @@ export default function LobbyPage() {
         ...docSnap.data(),
       }));
       setPlayers(playersList);
+
+      // Check if current user was removed from the lobby
+      const isUserInLobby = playersList.some((p) => p.id === currentUser.uid);
+      if (!isUserInLobby && currentUser) {
+        // User was removed, redirect to home
+        router.push("/");
+      }
     });
     return () => unsubscribe();
-  }, [lobbyId]);
+  }, [lobbyId, currentUser, router]);
 
   // Listen to current round
   useEffect(() => {
@@ -254,59 +203,48 @@ export default function LobbyPage() {
     }
   }
 
+  async function handleCloseLobby() {
+    // Only host can close lobby
+    if (!isHost || !lobbyId) return;
+
+    try {
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        closed: true,
+        closedAt: serverTimestamp(),
+      });
+      // Redirect host to home
+      router.push("/");
+    } catch (err) {
+      console.error("Error closing lobby:", err);
+    }
+  }
+
   async function handleStartRound() {
     // Only host can start rounds
-    if (!isHost || players.length < 2 || currentRound || !lobbyId) {
+    if (!isHost || players.length < 2 || currentRound || !lobbyId || !currentUser) {
       return;
     }
 
     try {
-      const eligibleScenarios = SCENARIOS.filter(
-        (scene) => scene.performers <= players.length
-      );
-      const scenarioPool =
-        eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
-      const scenario =
-        scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
-      const performerCount = Math.min(
-        scenario.performers ?? (Math.random() > 0.5 ? 3 : 2),
-        players.length,
-        3
-      );
-
-      const performers = getRandomItems(players, performerCount);
-      const rolesSelection = getRandomItems(ROLES, performers.length);
-      const roleMap = performers.reduce((acc, performer, index) => {
-        acc[performer.id] = rolesSelection[index];
-        return acc;
-      }, {});
-
-      const roundId = randomId("round");
-
-      // Create round document
-      const roundRef = doc(db, "lobbies", lobbyId, "rounds", roundId);
-      await setDoc(roundRef, {
-        scenario: {
-          title: scenario.title,
-          description: scenario.description,
+      const response = await fetch(`/api/lobbies/${lobbyId}/rounds`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        performers: performers.map((p) => ({ id: p.id, name: p.name })),
-        roles: roleMap,
-        status: "countdown",
-        duration,
-        startedAt: serverTimestamp(),
-        scores: {},
+        body: JSON.stringify({
+          duration,
+          userId: currentUser.uid,
+        }),
       });
 
-      // Update lobby document
-      const lobbyRef = doc(db, "lobbies", lobbyId);
-      await updateDoc(lobbyRef, {
-        status: "countdown",
-        currentRoundId: roundId,
-        startedAt: serverTimestamp(),
-        roundDuration: duration,
-      });
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Error starting round:", error);
+        return;
+      }
 
+      // Round will be created by API, real-time listener will pick it up
       setRatings({});
     } catch (err) {
       console.error("Error starting round:", err);
@@ -424,7 +362,17 @@ export default function LobbyPage() {
             <h1 className="text-4xl font-semibold text-white">
               {lobbyCode || "----"}
             </h1>
-            <p className="text-sm text-purple-100">Share with everyone</p>
+            <div className="flex flex-col items-end gap-2">
+              <p className="text-sm text-purple-100">Share with everyone</p>
+              {isHost && (
+                <button
+                  onClick={handleCloseLobby}
+                  className="rounded-full bg-red-500/80 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-500"
+                >
+                  Close Lobby
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -442,6 +390,7 @@ export default function LobbyPage() {
               onRemovePlayer={handleRemovePlayer}
               isFull={lobbyIsFull}
               isHost={isHost}
+              currentUserId={currentUser?.uid || null}
             />
 
             {!isRoundActive && isHost && (
