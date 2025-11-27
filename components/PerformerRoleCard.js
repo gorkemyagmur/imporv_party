@@ -7,10 +7,14 @@ export default function PerformerRoleCard({ name, role, performerId, currentUser
         {isCurrentUser ? "Your Role" : "Performer"}
       </p>
       <h4 className="mt-1 text-xl font-semibold text-white">{name}</h4>
-      {isCurrentUser ? (
-        <p className="mt-2 text-sm font-semibold text-amber-300">{role}</p>
+      {role ? (
+        isCurrentUser ? (
+          <p className="mt-2 text-sm font-semibold text-amber-300">{role}</p>
+        ) : (
+          <p className="mt-2 text-sm text-purple-100">{role}</p>
+        )
       ) : (
-        <p className="mt-2 text-sm text-purple-100">{role}</p>
+        <p className="mt-2 text-sm text-purple-200 italic">Role hidden</p>
       )}
     </div>
   );

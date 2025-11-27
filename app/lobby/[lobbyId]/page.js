@@ -213,14 +213,46 @@ export default function LobbyPage() {
         // User cancelled or error occurred
         if (err.name !== "AbortError") {
           // Fallback to clipboard
-          await navigator.clipboard.writeText(homeUrl);
-          alert("Link copied to clipboard!");
+          await copyToClipboard(homeUrl);
         }
       }
     } else {
       // Fallback to clipboard
-      await navigator.clipboard.writeText(homeUrl);
-      alert("Link copied to clipboard!");
+      await copyToClipboard(homeUrl);
+    }
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        alert("Link copied to clipboard!");
+        return;
+      }
+      
+      // Fallback to older method
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        document.execCommand("copy");
+        alert("Link copied to clipboard!");
+      } catch (err) {
+        // Last resort: show the link in an alert
+        alert(`Share this link: ${text}`);
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      // Last resort: show the link in an alert
+      alert(`Share this link: ${text}`);
     }
   }
 
@@ -779,10 +811,24 @@ export default function LobbyPage() {
             <div className="grid gap-4 sm:grid-cols-3">
               {currentRound.performers.map((performer) => {
                 const isCurrentUser = performer.id === currentUser?.uid;
-                // Show all performers to non-performers, only own role to performers
-                if (!isCurrentUser && currentRound.performers.some((p) => p.id === currentUser?.uid)) {
-                  return null; // Hide other performers' roles from current performer
+                const isCurrentUserAPerformer = currentRound.performers.some((p) => p.id === currentUser?.uid);
+                
+                // If current user is a performer, only show their own role
+                // If current user is NOT a performer, show all performers with their roles
+                if (isCurrentUserAPerformer && !isCurrentUser) {
+                  // Current user is a performer but this is not their card - hide the role
+                  return (
+                    <PerformerRoleCard
+                      key={performer.id}
+                      name={performer.name}
+                      role={null} // Hide role for other performers
+                      performerId={performer.id}
+                      currentUserId={currentUser?.uid || null}
+                    />
+                  );
                 }
+                
+                // Show role for: current user's own card OR non-performers viewing all
                 return (
                   <PerformerRoleCard
                     key={performer.id}

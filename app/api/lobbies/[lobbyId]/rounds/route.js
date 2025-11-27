@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { generateScenario, generateRoles } from "@/lib/grok-api";
 
 // Hardcoded scenarios for now (will be replaced with AI generation)
 const SCENARIOS = [
@@ -247,15 +248,29 @@ export async function POST(request, { params }) {
     const performerIds = currentRoundPlan.performers;
     const performers = players.filter((p) => performerIds.includes(p.id));
     
-    // Select scenario based on performer count
-    const eligibleScenarios = SCENARIOS.filter(
-      (scene) => scene.performers === performers.length || scene.performers <= performers.length
-    );
-    const scenarioPool =
-      eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
-    const scenario =
-      scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
-    const rolesSelection = getRandomItems(ROLES, performers.length);
+    // Generate scenario and roles using Grok API
+    let scenario;
+    let rolesSelection;
+    
+    try {
+      // Generate scenario for the number of performers
+      scenario = await generateScenario(performers.length);
+      
+      // Generate unique roles for each performer
+      rolesSelection = await generateRoles(performers.length);
+    } catch (error) {
+      console.error("Error generating scenario/roles with Grok API:", error);
+      // Fallback to hardcoded scenarios and roles
+      const eligibleScenarios = SCENARIOS.filter(
+        (scene) => scene.performers === performers.length || scene.performers <= performers.length
+      );
+      const scenarioPool =
+        eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
+      scenario =
+        scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
+      rolesSelection = getRandomItems(ROLES, performers.length);
+    }
+    
     const roleMap = performers.reduce((acc, performer, index) => {
       acc[performer.id] = rolesSelection[index];
       return acc;
