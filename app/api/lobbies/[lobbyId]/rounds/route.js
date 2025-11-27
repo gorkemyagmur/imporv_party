@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { generateScenario, generateRoles } from "@/lib/grok-api";
+import { generateScenario, generateRoles } from "@/lib/groq-api";
 
 // Hardcoded scenarios for now (will be replaced with AI generation)
 const SCENARIOS = [
@@ -248,7 +248,7 @@ export async function POST(request, { params }) {
     const performerIds = currentRoundPlan.performers;
     const performers = players.filter((p) => performerIds.includes(p.id));
     
-    // Generate scenario and roles using Grok API
+    // Generate scenario and roles using Groq API
     let scenario;
     let rolesSelection;
     
@@ -262,7 +262,7 @@ export async function POST(request, { params }) {
       rolesSelection = await generateRoles(performers.length);
       console.log("Generated roles:", rolesSelection);
     } catch (error) {
-      console.error("Error generating scenario/roles with Grok API:", error.message, error);
+      console.error("Error generating scenario/roles with Groq API:", error.message, error);
       console.log("Falling back to hardcoded scenarios and roles");
       // Fallback to hardcoded scenarios and roles
       const eligibleScenarios = SCENARIOS.filter(
