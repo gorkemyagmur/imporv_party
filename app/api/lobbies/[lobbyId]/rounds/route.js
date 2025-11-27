@@ -253,13 +253,17 @@ export async function POST(request, { params }) {
     let rolesSelection;
     
     try {
+      console.log(`Attempting to generate scenario and roles for ${performers.length} performers...`);
       // Generate scenario for the number of performers
       scenario = await generateScenario(performers.length);
+      console.log("Generated scenario:", scenario);
       
       // Generate unique roles for each performer
       rolesSelection = await generateRoles(performers.length);
+      console.log("Generated roles:", rolesSelection);
     } catch (error) {
-      console.error("Error generating scenario/roles with Grok API:", error);
+      console.error("Error generating scenario/roles with Grok API:", error.message, error);
+      console.log("Falling back to hardcoded scenarios and roles");
       // Fallback to hardcoded scenarios and roles
       const eligibleScenarios = SCENARIOS.filter(
         (scene) => scene.performers === performers.length || scene.performers <= performers.length
@@ -269,6 +273,8 @@ export async function POST(request, { params }) {
       scenario =
         scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
       rolesSelection = getRandomItems(ROLES, performers.length);
+      console.log("Using fallback scenario:", scenario.title);
+      console.log("Using fallback roles:", rolesSelection);
     }
     
     const roleMap = performers.reduce((acc, performer, index) => {
