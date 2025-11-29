@@ -807,6 +807,8 @@ export default function LobbyPage() {
             <ScenarioCard
               title={currentRound.scenario.title}
               description={currentRound.scenario.description}
+              story={currentRound.scenario.story}
+              scene={currentRound.scenario.scene}
             />
             <div className="grid gap-4 sm:grid-cols-3">
               {currentRound.performers.map((performer) => {

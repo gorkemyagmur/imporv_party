@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { generateScenario, generateRoles } from "@/lib/groq-api";
+import { generateScenario } from "@/lib/groq-api";
 
 // Hardcoded scenarios for now (will be replaced with AI generation)
 const SCENARIOS = [
@@ -248,37 +248,16 @@ export async function POST(request, { params }) {
     const performerIds = currentRoundPlan.performers;
     const performers = players.filter((p) => performerIds.includes(p.id));
     
-    // Generate scenario and roles using Groq API
-    let scenario;
-    let rolesSelection;
+    // Generate scenario with integrated roles using Groq API
+    // generateScenario handles fallback internally if API fails
+    console.log(`Attempting to generate scenario with roles for ${performers.length} performers...`);
+    const scenario = await generateScenario(performers.length);
+    console.log("Generated scenario:", scenario);
+    console.log("Generated roles:", scenario.roles);
     
-    try {
-      console.log(`Attempting to generate scenario and roles for ${performers.length} performers...`);
-      // Generate scenario for the number of performers
-      scenario = await generateScenario(performers.length);
-      console.log("Generated scenario:", scenario);
-      
-      // Generate unique roles for each performer
-      rolesSelection = await generateRoles(performers.length);
-      console.log("Generated roles:", rolesSelection);
-    } catch (error) {
-      console.error("Error generating scenario/roles with Groq API:", error.message, error);
-      console.log("Falling back to hardcoded scenarios and roles");
-      // Fallback to hardcoded scenarios and roles
-      const eligibleScenarios = SCENARIOS.filter(
-        (scene) => scene.performers === performers.length || scene.performers <= performers.length
-      );
-      const scenarioPool =
-        eligibleScenarios.length > 0 ? eligibleScenarios : SCENARIOS;
-      scenario =
-        scenarioPool[Math.floor(Math.random() * scenarioPool.length)];
-      rolesSelection = getRandomItems(ROLES, performers.length);
-      console.log("Using fallback scenario:", scenario.title);
-      console.log("Using fallback roles:", rolesSelection);
-    }
-    
+    // Create role map from scenario.roles
     const roleMap = performers.reduce((acc, performer, index) => {
-      acc[performer.id] = rolesSelection[index];
+      acc[performer.id] = scenario.roles[index];
       return acc;
     }, {});
 
@@ -294,7 +273,10 @@ export async function POST(request, { params }) {
     await roundRef.set({
       scenario: {
         title: scenario.title,
-        description: scenario.description,
+        story: scenario.story,
+        scene: scenario.scene,
+        // Keep description for backward compatibility (use scene)
+        description: scenario.scene,
       },
       performers: performers.map((p) => ({ id: p.id, name: p.name })),
       roles: roleMap,
