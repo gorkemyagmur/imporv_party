@@ -41,6 +41,7 @@ export default function LobbyPage() {
   const [userPendingRequest, setUserPendingRequest] = useState(null);
   const [wasInLobby, setWasInLobby] = useState(false);
   const [showGameCompleteModal, setShowGameCompleteModal] = useState(false);
+  const [isGeneratingScenario, setIsGeneratingScenario] = useState(false);
 
   const lobbyCode = (lobbyId || "").toUpperCase();
   const isRoundActive = Boolean(currentRound);
@@ -71,6 +72,9 @@ export default function LobbyPage() {
         }
         setLobby(data);
         setDuration(data.roundDuration || 60);
+        
+        // Sync generatingScenario state from lobby document
+        setIsGeneratingScenario(data.generatingScenario || false);
         
         // Show game complete modal if game is finished
         if (data.status === "finished") {
@@ -183,6 +187,15 @@ export default function LobbyPage() {
         setCurrentRound({
           id: snap.id,
           ...data,
+        });
+        // Reset generating scenario state when round is created
+        setIsGeneratingScenario(false);
+        // Reset flag in lobby document
+        const lobbyRef = doc(db, "lobbies", lobbyId);
+        updateDoc(lobbyRef, {
+          generatingScenario: false,
+        }).catch((err) => {
+          console.error("Error resetting generatingScenario flag:", err);
         });
         // Load current user's ratings
         if (currentUser && data.ratings?.[currentUser.uid]) {
@@ -357,11 +370,18 @@ export default function LobbyPage() {
     const userIsHost = lobby && currentUser && currentUser.uid === lobby.hostId;
     // Check if round is active (not in results or idle state)
     const isRoundActive = lobby?.status === "countdown" || lobby?.status === "rating";
-    if (!userIsHost || players.length < 2 || isRoundActive || !lobbyId || !currentUser) {
+    if (!userIsHost || players.length < 2 || isRoundActive || !lobbyId || !currentUser || isGeneratingScenario) {
       return;
     }
 
     try {
+      setIsGeneratingScenario(true);
+      // Set flag in lobby document so all players can see the loading state
+      const lobbyRef = doc(db, "lobbies", lobbyId);
+      await updateDoc(lobbyRef, {
+        generatingScenario: true,
+      });
+      
       const response = await fetch(`/api/lobbies/${lobbyId}/rounds`, {
         method: "POST",
         headers: {
@@ -377,14 +397,29 @@ export default function LobbyPage() {
         const error = await response.json();
         console.error("Error starting round:", error);
         alert(`Error starting round: ${error.error || "Unknown error"}`);
+        setIsGeneratingScenario(false);
+        await updateDoc(lobbyRef, {
+          generatingScenario: false,
+        });
         return;
       }
 
       // Round will be created by API, real-time listener will pick it up
+      // generatingScenario flag will be reset when currentRound is set (via useEffect)
       setRatings({});
     } catch (err) {
       console.error("Error starting round:", err);
       alert(`Error starting round: ${err.message || "Please try again"}`);
+      setIsGeneratingScenario(false);
+      // Reset flag on error
+      try {
+        const lobbyRef = doc(db, "lobbies", lobbyId);
+        await updateDoc(lobbyRef, {
+          generatingScenario: false,
+        });
+      } catch (updateErr) {
+        console.error("Error resetting generatingScenario flag:", updateErr);
+      }
     }
   }
 
@@ -769,17 +804,28 @@ export default function LobbyPage() {
             {isHost && (
               <button
                 onClick={handleStartRound}
-                disabled={!canStartRound}
+                disabled={!canStartRound || isGeneratingScenario}
                 className="rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 px-6 py-5 text-xl font-semibold text-white shadow-xl shadow-pink-500/40 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isRoundActive ? "Round in progress" : "Start new round"}
+                {isGeneratingScenario ? "Sahne Oluşturuluyor..." : isRoundActive ? "Round in progress" : "Start new round"}
               </button>
             )}
 
             {!isHost && !isRoundActive && (
               <div className="rounded-3xl bg-white/10 p-5 text-center text-white">
                 <p className="text-sm text-purple-100">
-                  {lobby?.currentRoundNumber > 0 ? "Rounds In progress" : "Waiting for host to start the round..."}
+                  {isGeneratingScenario ? "Sahne Oluşturuluyor..." : lobby?.currentRoundNumber > 0 ? "Rounds In progress" : "Waiting for host to start the round..."}
+                </p>
+              </div>
+            )}
+
+            {isGeneratingScenario && (
+              <div className="rounded-3xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 p-5 text-center text-white">
+                <p className="text-sm font-semibold text-purple-200 animate-pulse">
+                  🎭 Sahne Oluşturuluyor...
+                </p>
+                <p className="text-xs text-purple-300 mt-2">
+                  Lütfen bekleyin, yaratıcı senaryo hazırlanıyor
                 </p>
               </div>
             )}
