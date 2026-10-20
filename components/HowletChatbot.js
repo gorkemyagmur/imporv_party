@@ -52,7 +52,10 @@ export default function HowletChatbot() {
       const data = await response.json();
       
       // Extract assistant response
-      const assistantMessage = data.output?.message || "Özür dilerim, bir hata oluştu.";
+      const assistantMessage =
+        typeof data.output === "string" && data.output
+          ? data.output
+          : "Özür dilerim, bir hata oluştu.";
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: assistantMessage },
