@@ -8,6 +8,7 @@ export default function HowletChatbot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const sessionIdRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -48,7 +49,10 @@ export default function HowletChatbot() {
             Accept: "text/event-stream",
             "x-api-key": "hk_Rt5HfyrrHpCEiJ_RkugadkgpDlgeE_FcidHqUAXKvnc",
           },
-          body: JSON.stringify({ input: { message } }),
+          body: JSON.stringify({
+            input: { message },
+            ...(sessionIdRef.current && { session_id: sessionIdRef.current }),
+          }),
         }
       );
 
@@ -68,6 +72,9 @@ export default function HowletChatbot() {
           evt = JSON.parse(line.slice(5).trim());
         } catch {
           return;
+        }
+        if (evt.session_id) {
+          sessionIdRef.current = evt.session_id;
         }
         if (evt.type === "token" && evt.token) {
           if (!started) {
