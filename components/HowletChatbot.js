@@ -27,40 +27,80 @@ export default function HowletChatbot() {
     setInput("");
     setIsLoading(true);
 
+    const message = input;
+    let started = false;
+    const appendToken = (token) => {
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        next[next.length - 1] = { ...last, content: last.content + token };
+        return next;
+      });
+    };
+
     try {
-      // Call Howlet API Endpoint
       const response = await fetch(
-        "https://acme.on-prem-k3s-dev.howlet.ai/api/v1/endpoints/tekno/invoke",
+        "https://acme.on-prem-k3s-dev.howlet.ai/api/v1/endpoints/tekno/invoke/stream",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Accept: "text/event-stream",
             "x-api-key": "hk_Rt5HfyrrHpCEiJ_RkugadkgpDlgeE_FcidHqUAXKvnc",
           },
-          body: JSON.stringify({
-            input: {
-              message: input,
-            },
-          }),
+          body: JSON.stringify({ input: { message } }),
         }
       );
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error(`API error: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      // Extract assistant response
-      const reply = data?.data?.output ?? data?.output;
-      const assistantMessage =
-        typeof reply === "string" && reply
-          ? reply
-          : "Özür dilerim, bir hata oluştu.";
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: assistantMessage },
-      ]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const handleEvent = (raw) => {
+        const line = raw.split("\n").find((l) => l.startsWith("data:"));
+        if (!line) return;
+        let evt;
+        try {
+          evt = JSON.parse(line.slice(5).trim());
+        } catch {
+          return;
+        }
+        if (evt.type === "token" && evt.token) {
+          if (!started) {
+            started = true;
+            setIsLoading(false);
+            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+          }
+          appendToken(evt.token);
+        } else if (evt.type === "done" && !started && evt.content) {
+          started = true;
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: evt.content },
+          ]);
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop();
+        events.forEach(handleEvent);
+      }
+      if (buffer.trim()) handleEvent(buffer);
+
+      if (!started) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Özür dilerim, bir hata oluştu." },
+        ]);
+      }
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => [
@@ -113,7 +153,7 @@ export default function HowletChatbot() {
                       : "bg-gray-200 text-gray-900 rounded-bl-none"
                   }`}
                 >
-                  <p className="text-sm break-words">{msg.content}</p>
+                  <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
             ))}
