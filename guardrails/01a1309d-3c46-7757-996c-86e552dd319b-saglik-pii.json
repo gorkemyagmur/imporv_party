@@ -1,0 +1,22 @@
+{
+  "config": {
+    "action": "redact",
+    "entities": [
+      "TCKN",
+      "TR_PHONE",
+      "EMAIL_ADDRESS",
+      "PHONE_NUMBER",
+      "CREDIT_CARD",
+      "LOCATION",
+      "PERSON"
+    ],
+    "mask_style": "redact",
+    "threshold": 0.5
+  },
+  "description": null,
+  "engine": "presidio",
+  "metadata_extra": null,
+  "name": "saglik-pii",
+  "scope": "artefact",
+  "type": "input"
+}

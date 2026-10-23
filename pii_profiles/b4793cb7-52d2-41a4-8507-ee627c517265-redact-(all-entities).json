@@ -1,0 +1,8 @@
+{
+  "config": {
+    "enabled": true,
+    "entities": []
+  },
+  "name": "Redact (all entities)",
+  "pii_mode": "redact"
+}

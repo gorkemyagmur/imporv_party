@@ -1,0 +1,14 @@
+{
+  "config": {
+    "confidence_threshold": 0.75,
+    "endpoint_id": null,
+    "llm_fallback": true,
+    "parser_model": null,
+    "parser_model_base_url": null,
+    "parser_model_card_id": null,
+    "parser_prompt": null,
+    "parser_provider": null
+  },
+  "name": "Docling (1)",
+  "parser_mode": "docling"
+}

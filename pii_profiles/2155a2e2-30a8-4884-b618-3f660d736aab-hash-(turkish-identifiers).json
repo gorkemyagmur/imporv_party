@@ -1,0 +1,12 @@
+{
+  "config": {
+    "enabled": true,
+    "entities": [
+      "IBAN_TR",
+      "PERSON",
+      "TR_KIMLIK"
+    ]
+  },
+  "name": "Hash (Turkish identifiers)",
+  "pii_mode": "hash"
+}

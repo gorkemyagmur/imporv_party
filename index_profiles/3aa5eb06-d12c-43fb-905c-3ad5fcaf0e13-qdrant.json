@@ -1,0 +1,11 @@
+{
+  "config": {
+    "distance_metric": "cosine",
+    "hnsw_ef_construction": 200,
+    "hnsw_m": 32,
+    "hybrid_search": false,
+    "index_type": "hnsw"
+  },
+  "name": "Qdrant",
+  "store_type": "qdrant"
+}

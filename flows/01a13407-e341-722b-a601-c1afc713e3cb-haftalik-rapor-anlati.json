@@ -1,0 +1,130 @@
+{
+  "created_by_name": "",
+  "description": null,
+  "flow_data": {
+    "edges": [
+      {
+        "animated": true,
+        "id": "xy-edge__chat_input-1791874329167-prompt_template-1791874341408",
+        "source": "chat_input-1791874329167",
+        "target": "prompt_template-1791874341408"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__prompt_template-1791874341408-llm_bedrock-1791874362059",
+        "source": "prompt_template-1791874341408",
+        "target": "llm_bedrock-1791874362059"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__llm_bedrock-1791874362059-chat_output-1791874365863",
+        "source": "llm_bedrock-1791874362059",
+        "target": "chat_output-1791874365863"
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "category": "io",
+          "componentType": "chat_input",
+          "config": {},
+          "description": "The user's message - flow entry point",
+          "icon": "\ud83d\udcac",
+          "label": "Chat Input"
+        },
+        "dragging": false,
+        "id": "chat_input-1791874329167",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 400,
+          "y": 360
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "howlet",
+          "componentType": "howlet_prompt",
+          "config": {
+            "prompt_id": "01a13099-b39a-7f6b-a681-2b32f348f0bc"
+          },
+          "description": "Render a saved prompt from the Prompts library",
+          "icon": "\ud83d\udcdd",
+          "label": "haftalik-rapor-anlati",
+          "resourceSummary": "2"
+        },
+        "dragging": false,
+        "id": "prompt_template-1791874341408",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 560,
+          "y": 360
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "llm",
+          "componentType": "llm_bedrock",
+          "config": {
+            "model": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "temperature": 0.3
+          },
+          "description": "Call a model via AWS Bedrock",
+          "icon": "\ud83d\udfe0",
+          "label": "Claude Haiku 4.5",
+          "resourceSummary": ""
+        },
+        "dragging": false,
+        "id": "llm_bedrock-1791874362059",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 700,
+          "y": 360
+        },
+        "selected": true,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "io",
+          "componentType": "chat_output",
+          "config": {},
+          "description": "The reply shown back to the user",
+          "icon": "\ud83d\udce4",
+          "label": "Chat Output"
+        },
+        "dragging": false,
+        "id": "chat_output-1791874365863",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 860,
+          "y": 360
+        },
+        "selected": false,
+        "type": "howletNode"
+      }
+    ],
+    "variables": {}
+  },
+  "id": "01a13407-e341-722b-a601-c1afc713e3cb",
+  "metadata_extra": null,
+  "name": "haftalik-rapor-anlati",
+  "project_id": "f876af67-d03b-47ce-bbb0-b432a7e3ad03",
+  "version": 18,
+  "version_id": "51d5301b-c469-433c-a9b9-df8649106e26"
+}

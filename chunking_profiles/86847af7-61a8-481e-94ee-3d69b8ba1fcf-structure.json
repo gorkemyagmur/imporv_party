@@ -1,0 +1,11 @@
+{
+  "config": {
+    "heading_levels": [
+      1,
+      2,
+      3
+    ]
+  },
+  "name": "Structure",
+  "strategy": "structure"
+}

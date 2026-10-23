@@ -1,0 +1,9 @@
+{
+  "config": {
+    "distance_metric": "cosine",
+    "hybrid_search": true,
+    "index_type": "hnsw"
+  },
+  "name": "pgvector",
+  "store_type": "pgvector"
+}

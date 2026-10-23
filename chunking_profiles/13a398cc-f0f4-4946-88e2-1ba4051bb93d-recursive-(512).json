@@ -1,0 +1,14 @@
+{
+  "config": {
+    "chunk_size": 512,
+    "overlap": 50,
+    "separators": [
+      "\n\n",
+      "\n",
+      ". ",
+      " "
+    ]
+  },
+  "name": "Recursive (512)",
+  "strategy": "recursive"
+}

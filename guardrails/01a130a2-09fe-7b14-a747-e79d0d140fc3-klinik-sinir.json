@@ -1,0 +1,32 @@
+{
+  "config": {
+    "action": "block",
+    "allowed_topics": [
+      "hasta g\u00fcvenli\u011fi prosed\u00fcr\u00fc",
+      "olay bildirimi",
+      "kalite g\u00f6stergesi",
+      "olay istatisti\u011fi"
+    ],
+    "banned_terms": [],
+    "block_message": "Bu istek Hasta G\u00fcvenli\u011fi Asistan\u0131'n\u0131n kapsam\u0131 d\u0131\u015f\u0131nda. Klinik sorular i\u00e7in ilgili hekime, ki\u015fisel veri i\u00e7in Veri Sorumlusu \u0130rtibat Ki\u015fisi'ne ba\u015fvurun (KY-04).",
+    "blocked_topics": [
+      "tan\u0131 koyma",
+      "tedavi \u00f6nerisi",
+      "ila\u00e7 dozu \u00f6nerisi"
+    ],
+    "case_sensitive": false,
+    "detect_jailbreak": true,
+    "llm_rules": [
+      {
+        "instruction": "Belirli bir hastan\u0131n veya \u00e7al\u0131\u015fan\u0131n kimli\u011fini, ad\u0131n\u0131 ya da hangi ki\u015finin hangi olay\u0131 ya\u015fad\u0131\u011f\u0131n\u0131 \u00f6\u011frenmeye \u00e7al\u0131\u015fan mesajlar ihlaldir. Toplu istatistik, olay kodu ve prosed\u00fcr sorular\u0131 ihlal de\u011fildir.",
+        "name": "kimlik-sorgusu"
+      }
+    ]
+  },
+  "description": null,
+  "engine": "nemo",
+  "metadata_extra": null,
+  "name": "klinik-sinir",
+  "scope": "artefact",
+  "type": "input"
+}

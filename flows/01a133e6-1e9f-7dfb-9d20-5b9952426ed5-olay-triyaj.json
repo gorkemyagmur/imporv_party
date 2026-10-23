@@ -1,0 +1,270 @@
+{
+  "created_by_name": "",
+  "description": null,
+  "flow_data": {
+    "edges": [
+      {
+        "animated": true,
+        "id": "xy-edge__chat_input-1791872107757-howlet_guardrail-1791872114797",
+        "source": "chat_input-1791872107757",
+        "target": "howlet_guardrail-1791872114797"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__howlet_guardrail-1791872114797-prompt_template-1791872123221",
+        "source": "howlet_guardrail-1791872114797",
+        "target": "prompt_template-1791872123221"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__prompt_template-1791872123221-llm_bedrock-1791872129733",
+        "source": "prompt_template-1791872123221",
+        "target": "llm_bedrock-1791872129733"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__llm_bedrock-1791872129733-structured_output-1791872136967",
+        "source": "llm_bedrock-1791872129733",
+        "target": "structured_output-1791872136967"
+      },
+      {
+        "animated": true,
+        "id": "xy-edge__structured_output-1791872136967-chat_output-1791872153689",
+        "source": "structured_output-1791872136967",
+        "target": "chat_output-1791872153689"
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "category": "io",
+          "componentType": "chat_input",
+          "config": {},
+          "description": "The user's message - flow entry point",
+          "icon": "\ud83d\udcac",
+          "label": "Chat Input"
+        },
+        "dragging": false,
+        "id": "chat_input-1791872107757",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 480,
+          "y": 500
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "howlet",
+          "componentType": "howlet_guardrail",
+          "config": {
+            "guardrail_id": "01a1309d-3c46-7757-996c-86e552dd319b"
+          },
+          "description": "Check / redact with Howlet Guard (policy or PII)",
+          "icon": "\ud83d\udee1\ufe0f",
+          "label": "saglik-pii",
+          "resourceSummary": "presidio"
+        },
+        "dragging": false,
+        "id": "howlet_guardrail-1791872114797",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 640,
+          "y": 500
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "howlet",
+          "componentType": "howlet_prompt",
+          "config": {
+            "prompt_id": "01a13091-d28b-792a-8242-692128769fd3"
+          },
+          "description": "Render a saved prompt from the Prompts library",
+          "icon": "\ud83d\udcdd",
+          "label": "olay-triyaj",
+          "resourceSummary": "2"
+        },
+        "dragging": false,
+        "id": "prompt_template-1791872123221",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 780,
+          "y": 500
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "llm",
+          "componentType": "llm_bedrock",
+          "config": {
+            "max_tokens": 1500,
+            "model": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "temperature": 2
+          },
+          "description": "Call a model via AWS Bedrock",
+          "icon": "\ud83d\udfe0",
+          "label": "Claude Haiku 4.5",
+          "resourceSummary": ""
+        },
+        "dragging": false,
+        "id": "llm_bedrock-1791872129733",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 920,
+          "y": 500
+        },
+        "selected": true,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "logic",
+          "componentType": "structured_output",
+          "config": {
+            "model": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "provider": "bedrock",
+            "schema_json": {
+              "properties": {
+                "bildirim_no": {
+                  "type": "string"
+                },
+                "birim": {
+                  "type": "string"
+                },
+                "ek_kodlar": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "hasta_protokol_no": {
+                  "type": "string"
+                },
+                "olay_kodu": {
+                  "type": "string"
+                },
+                "olay_turu": {
+                  "enum": [
+                    "Hasta d\u00fc\u015fmesi",
+                    "\u0130la\u00e7 g\u00fcvenli\u011fi",
+                    "Kimlik do\u011frulama",
+                    "Enfeksiyon kontrol",
+                    "G\u00fcvenli cerrahi",
+                    "Laboratuvar",
+                    "T\u0131bbi cihaz",
+                    "\u00c7al\u0131\u015fan g\u00fcvenli\u011fi"
+                  ],
+                  "type": "string"
+                },
+                "oncelik": {
+                  "enum": [
+                    "Kritik",
+                    "Y\u00fcksek",
+                    "Orta",
+                    "D\u00fc\u015f\u00fck"
+                  ],
+                  "type": "string"
+                },
+                "ozet": {
+                  "type": "string"
+                },
+                "prosedur_ref": {
+                  "type": "string"
+                },
+                "uyari": {
+                  "type": "string"
+                },
+                "vardiya": {
+                  "type": "string"
+                },
+                "zarar_derecesi": {
+                  "enum": [
+                    "Ramak kala",
+                    "Zarars\u0131z",
+                    "Hafif zarar",
+                    "Ciddi zarar"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bildirim_no",
+                "birim",
+                "olay_kodu",
+                "olay_turu",
+                "zarar_derecesi",
+                "oncelik",
+                "prosedur_ref",
+                "ozet"
+              ],
+              "type": "object"
+            }
+          },
+          "description": "Force upstream text into schema-valid JSON",
+          "icon": "\ud83e\udde9",
+          "label": "Claude Haiku 4.5",
+          "resourceSummary": ""
+        },
+        "dragging": false,
+        "id": "structured_output-1791872136967",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 1060,
+          "y": 500
+        },
+        "selected": false,
+        "type": "howletNode"
+      },
+      {
+        "data": {
+          "category": "io",
+          "componentType": "chat_output",
+          "config": {},
+          "description": "The reply shown back to the user",
+          "icon": "\ud83d\udce4",
+          "label": "Chat Output"
+        },
+        "dragging": false,
+        "id": "chat_output-1791872153689",
+        "measured": {
+          "height": 56,
+          "width": 56
+        },
+        "position": {
+          "x": 1200,
+          "y": 500
+        },
+        "selected": false,
+        "type": "howletNode"
+      }
+    ],
+    "variables": {}
+  },
+  "id": "01a133e6-1e9f-7dfb-9d20-5b9952426ed5",
+  "metadata_extra": null,
+  "name": "olay-triyaj",
+  "project_id": "f876af67-d03b-47ce-bbb0-b432a7e3ad03",
+  "version": 35,
+  "version_id": "51d5301b-c469-433c-a9b9-df8649106e26"
+}

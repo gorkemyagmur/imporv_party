@@ -1,0 +1,12 @@
+{
+  "config": {
+    "enabled": true,
+    "entities": [
+      "EMAIL",
+      "PHONE",
+      "PHONE_TR"
+    ]
+  },
+  "name": "Mask (contact details)",
+  "pii_mode": "mask"
+}

@@ -1,0 +1,16 @@
+{
+  "config": {
+    "enabled": true,
+    "entities": [
+      "ADDRESS",
+      "DOB",
+      "EMAIL",
+      "PERSON",
+      "PHONE",
+      "PHONE_TR",
+      "TR_KIMLIK"
+    ]
+  },
+  "name": "Saglik Kisisel Verisi",
+  "pii_mode": "redact"
+}

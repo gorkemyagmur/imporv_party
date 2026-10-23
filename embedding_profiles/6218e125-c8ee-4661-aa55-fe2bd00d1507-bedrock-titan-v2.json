@@ -1,0 +1,7 @@
+{
+  "config": {},
+  "dimension": 1024,
+  "model": "amazon.titan-embed-text-v2:0",
+  "name": "Bedrock Titan v2",
+  "provider": "bedrock"
+}

@@ -1,0 +1,10 @@
+{
+  "archive_enabled": false,
+  "archive_retention_days": 7,
+  "bootstrap_servers": "howlet-tenant-acme-stream-db:9092",
+  "consumer_group": null,
+  "description": null,
+  "name": "hasta-guvenligi-olaylari",
+  "schema_subject": null,
+  "source_topic": ""
+}

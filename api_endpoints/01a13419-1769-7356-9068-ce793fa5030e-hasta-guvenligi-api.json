@@ -1,0 +1,12 @@
+{
+  "auth_mode": "api_key",
+  "config": {},
+  "description": null,
+  "endpoint_type": "agent",
+  "metadata_extra": null,
+  "method": "POST",
+  "name": "Hasta Guvenligi API",
+  "rate_limit": 60,
+  "resource_id": "01a133dc-c18e-7b7f-8f7e-529f3eebff2f",
+  "slug": "hasta-guvenligi"
+}

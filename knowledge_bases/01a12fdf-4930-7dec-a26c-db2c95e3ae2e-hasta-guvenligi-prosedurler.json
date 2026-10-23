@@ -1,0 +1,77 @@
+{
+  "chunking_profile_id": "${ref:chunking_profile:Prosedur Bolumleri}",
+  "confidence_threshold": 0.2,
+  "description": "HG-01..07",
+  "document_manifest": [
+    {
+      "content_sha256": "a40ee266142142cf819bc2e37345ce557a5d5bd231a0a9def8b3a91e85e48554",
+      "document_id": "571d77b8-2ba3-447e-a622-dff45bb7353b",
+      "filename": "HG-05_enfeksiyon_kontrol.md"
+    },
+    {
+      "content_sha256": "a511dae221a0d8218880c2d350ac2f2c9c62b58ee7201818ef7719bd416baa2d",
+      "document_id": "c77f4222-6e83-45e7-b7a4-122ae6111ed4",
+      "filename": "HG-01_olay_siniflandirma.md"
+    },
+    {
+      "content_sha256": "bc92e6c9c7bd964425c2a778dcdea2981e8936a7f020cd5a3480d2276e2e060d",
+      "document_id": "3c58dfc1-da85-44bc-84af-adff2a4d72c8",
+      "filename": "HG-04_kimlik_dogrulama.md"
+    },
+    {
+      "content_sha256": "bea2644fe59cfc51afa853e0409ea02e98979732947a297c432b3bb09c836076",
+      "document_id": "942fddd2-6dc7-40b2-b4b1-843654fd4a43",
+      "filename": "HG-03_dusme_onleme.md"
+    },
+    {
+      "content_sha256": "e37ee3e89cdbc17ab94b6e6293823c7ad09a67a93e8a3a491d81ae9a57b5de32",
+      "document_id": "4f256e6a-f0aa-4b86-87e9-62d8fcbdfb00",
+      "filename": "HG-06_guvenli_cerrahi.md"
+    },
+    {
+      "content_sha256": "e970432e61ccbb6419ca516aadce6a8ec07ad367f511c7fc3a38b6ae07ab6215",
+      "document_id": "2629b56a-f9a9-486e-bf01-659fe7db3981",
+      "filename": "HG-07_tibbi_cihaz_calisan_guvenligi.md"
+    },
+    {
+      "content_sha256": "fec8b6e9935969e2ff06875c2ef29a21f50004218cf31d46a1559aa9e42b3dc9",
+      "document_id": "99ecefcd-d500-4ea0-ac11-69a851f6cb74",
+      "filename": "HG-02_ilac_guvenligi.md"
+    }
+  ],
+  "document_manifest_total": 7,
+  "document_manifest_truncated": false,
+  "embedding_profile_id": "${ref:embedding_profile:Bedrock Titan v2}",
+  "id": "01a12fdf-4930-7dec-a26c-db2c95e3ae2e",
+  "index_profile_id": "${ref:index_profile:pgvector}",
+  "index_signature": null,
+  "indexed_origin_hash": "9b4e95b3bf3edc2c47a6e68119892c1ec0a80afba2ded6546daa23e3fed1f264",
+  "kb_digest": "8c1db5aa89efb2bae20f1a455d17616075bc30a9968346b8fd6606df22538cb7",
+  "kb_digest_complete": true,
+  "kb_digest_profiles_pinned": true,
+  "name": "Hasta Guvenligi Prosedurler",
+  "parser_forbid_external": false,
+  "parser_mode": "docling",
+  "parser_model": null,
+  "parser_model_base_url": null,
+  "parser_model_card_id": null,
+  "parser_profile_id": "${ref:parser_profile:Docling (1)}",
+  "parser_prompt": null,
+  "parser_provider": null,
+  "pii_config": {},
+  "profile_pins": {
+    "chunking": "c316f617-d203-47d5-bde7-c6c62a1df3be",
+    "embedding": "6218e125-c8ee-4661-aa55-fe2bd00d1507",
+    "index": "687ddf25-8393-4e83-aece-58ba0ce1379c",
+    "names": {
+      "chunking": "Prosedur Bolumleri",
+      "embedding": "Bedrock Titan v2",
+      "index": "pgvector",
+      "parser": "Docling (1)"
+    },
+    "parser": "1af4532e-d9c8-4303-854b-37bd0f13281a",
+    "parser_mode": "docling",
+    "parser_model": null,
+    "pii": null
+  }
+}

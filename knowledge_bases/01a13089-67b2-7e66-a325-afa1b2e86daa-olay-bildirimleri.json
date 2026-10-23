@@ -1,0 +1,69 @@
+{
+  "chunking_profile_id": "${ref:chunking_profile:Prosedur Bolumleri}",
+  "confidence_threshold": 0.2,
+  "description": "",
+  "document_manifest": [
+    {
+      "content_sha256": "1270618addb15ff11cb78ac5b63bc21785dcf6967e68edf1b6957bcced566583",
+      "document_id": "01010280-f7ea-45a8-afc0-b266b40ba6dd",
+      "filename": "OB-2026-102.md"
+    },
+    {
+      "content_sha256": "20fceeb11db6189541268bbc24493c462f10237022b93292908419654f5aff41",
+      "document_id": "d17cf0a2-07e7-44e0-a0f2-183251ed09fb",
+      "filename": "OB-2026-105.md"
+    },
+    {
+      "content_sha256": "5eb30de43c3731cfddc101567b5af575f71af91d54f1aaf577ffa6ec6635721f",
+      "document_id": "4483d32e-99b1-4f52-b683-6c4a6dac8281",
+      "filename": "OB-2026-101.md"
+    },
+    {
+      "content_sha256": "aa3b1006056ae9edeaf29747079f8c11d18e7fca7d8c1504b719e58e9fcf7b8b",
+      "document_id": "5611a5bb-d6cc-407e-925e-a6effdcb7891",
+      "filename": "OB-2026-104.md"
+    },
+    {
+      "content_sha256": "dee3073956f2ed895dc0b0503dc0476d9e58237fcba7f7df33484f49483f204e",
+      "document_id": "6a6b9f99-c66b-4eb4-af88-2b3555728568",
+      "filename": "OB-2026-103.md"
+    }
+  ],
+  "document_manifest_total": 5,
+  "document_manifest_truncated": false,
+  "embedding_profile_id": "${ref:embedding_profile:Bedrock Titan v2}",
+  "id": "01a13089-67b2-7e66-a325-afa1b2e86daa",
+  "index_profile_id": "${ref:index_profile:OpenSearch}",
+  "index_signature": null,
+  "indexed_origin_hash": "c0f3b8be6b69067c2e85587340954504e04f65974a69fce71c4f0bdf617760b9",
+  "kb_digest": "d9c834f7e30d00ff095b96b48eb4ef1c28c5b32f915c9bce2a6592454b2013ff",
+  "kb_digest_complete": true,
+  "kb_digest_profiles_pinned": true,
+  "name": "Olay Bildirimleri",
+  "parser_forbid_external": false,
+  "parser_mode": "docling",
+  "parser_model": null,
+  "parser_model_base_url": null,
+  "parser_model_card_id": null,
+  "parser_profile_id": "${ref:parser_profile:Docling (1)}",
+  "parser_prompt": null,
+  "parser_provider": null,
+  "pii_config": {},
+  "pii_profile_id": "${ref:pii_profile:Saglik Kisisel Verisi}",
+  "profile_pins": {
+    "chunking": "c316f617-d203-47d5-bde7-c6c62a1df3be",
+    "embedding": "6218e125-c8ee-4661-aa55-fe2bd00d1507",
+    "index": "5dfaca5e-10f2-45a4-804d-61c32e0ad2e5",
+    "names": {
+      "chunking": "Prosedur Bolumleri",
+      "embedding": "Bedrock Titan v2",
+      "index": "OpenSearch",
+      "parser": "Docling (1)",
+      "pii": "Saglik Kisisel Verisi"
+    },
+    "parser": "1af4532e-d9c8-4303-854b-37bd0f13281a",
+    "parser_mode": "docling",
+    "parser_model": null,
+    "pii": "cf2de61f-5ba3-4eb9-9d39-fb1b784062c9"
+  }
+}

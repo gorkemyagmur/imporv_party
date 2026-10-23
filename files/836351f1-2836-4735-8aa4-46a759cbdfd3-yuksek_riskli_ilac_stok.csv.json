@@ -1,0 +1,11 @@
+{
+  "checksum_sha256": "292a19cc1b4433079537f7729aad90322f0063656d7ea51fb29a283bae332f6f",
+  "content_type": "text/csv",
+  "current_version_id": "f82d68f7-2c5e-487c-8d71-bb0eb6b6b02e",
+  "environment_id": "f4a01b8f-8b63-4ede-82d1-d57bfd6c34ff",
+  "name": "yuksek_riskli_ilac_stok.csv",
+  "object_key": "t/0b5f56e2-23fb-4fac-b043-501e1b9ddf29/p/f876af67-d03b-47ce-bbb0-b432a7e3ad03/o/836351f1-2836-4735-8aa4-46a759cbdfd3",
+  "path": "/veri-setleri/yuksek_riskli_ilac_stok.csv",
+  "project_id": "f876af67-d03b-47ce-bbb0-b432a7e3ad03",
+  "size_bytes": 770
+}

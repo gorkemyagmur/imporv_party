@@ -1,0 +1,10 @@
+{
+  "config": {
+    "child_chunk_size": 256,
+    "child_overlap": 32,
+    "parent_chunk_size": 1536,
+    "separators": null
+  },
+  "name": "Prosedur Bolumleri",
+  "strategy": "parent_child"
+}

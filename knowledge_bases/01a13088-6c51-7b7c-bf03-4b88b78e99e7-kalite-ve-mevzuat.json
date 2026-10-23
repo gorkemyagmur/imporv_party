@@ -1,0 +1,62 @@
+{
+  "chunking_profile_id": "${ref:chunking_profile:Prosedur Bolumleri}",
+  "confidence_threshold": 0.2,
+  "description": "",
+  "document_manifest": [
+    {
+      "content_sha256": "22036ca26fbae4df83d7bf6b53c113f8cb631b343deb2b86e3a2a885091afde9",
+      "document_id": "7a4a9782-0540-4efd-83d2-96b4b846a228",
+      "filename": "KY-03_dokuman_yonetimi.md"
+    },
+    {
+      "content_sha256": "2ddc3af436c667c66fbfdb8acb1042f3f95e46972d997bded8bcf026087749e0",
+      "document_id": "442d3db4-e7a1-4f4e-925b-e278de5d9e4b",
+      "filename": "KY-01_kalite_plani_gostergeler.md"
+    },
+    {
+      "content_sha256": "90944bf2f1aea06ffb58aaf4d1c214bf35a599b46a451a14b6d6b11dbad916e1",
+      "document_id": "b1d6cca5-6c42-4d13-8548-b4915c47f30f",
+      "filename": "KY-04_kisisel_saglik_verisi.md"
+    },
+    {
+      "content_sha256": "9e4b6d3f92a26f80403e3eac4fe777c3a216c7e01545a28419d7a669c1a0bfa6",
+      "document_id": "9d75e924-b72b-48ad-ac3e-883cc04c4060",
+      "filename": "KY-02_olay_bildirim_proseduru.md"
+    }
+  ],
+  "document_manifest_total": 4,
+  "document_manifest_truncated": false,
+  "embedding_profile_id": "${ref:embedding_profile:Bedrock Titan v2}",
+  "id": "01a13088-6c51-7b7c-bf03-4b88b78e99e7",
+  "index_profile_id": "${ref:index_profile:OpenSearch}",
+  "index_signature": null,
+  "indexed_origin_hash": "5b03cba8e4d8ecff136b0277672528cad5baf20d9685bde93957aa6960b97603",
+  "kb_digest": "2012732c196336f0b047c4127092df03cb1d3a7da18a67da542760545cc88d98",
+  "kb_digest_complete": true,
+  "kb_digest_profiles_pinned": true,
+  "name": "Kalite ve Mevzuat",
+  "parser_forbid_external": false,
+  "parser_mode": "docling",
+  "parser_model": null,
+  "parser_model_base_url": null,
+  "parser_model_card_id": null,
+  "parser_profile_id": "${ref:parser_profile:Docling (1)}",
+  "parser_prompt": null,
+  "parser_provider": null,
+  "pii_config": {},
+  "profile_pins": {
+    "chunking": "c316f617-d203-47d5-bde7-c6c62a1df3be",
+    "embedding": "6218e125-c8ee-4661-aa55-fe2bd00d1507",
+    "index": "5dfaca5e-10f2-45a4-804d-61c32e0ad2e5",
+    "names": {
+      "chunking": "Prosedur Bolumleri",
+      "embedding": "Bedrock Titan v2",
+      "index": "OpenSearch",
+      "parser": "Docling (1)"
+    },
+    "parser": "1af4532e-d9c8-4303-854b-37bd0f13281a",
+    "parser_mode": "docling",
+    "parser_model": null,
+    "pii": null
+  }
+}

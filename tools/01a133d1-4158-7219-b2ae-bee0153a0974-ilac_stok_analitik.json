@@ -1,0 +1,35 @@
+{
+  "api_config": {
+    "dataset": {
+      "dataset_id": "f5171c38-1a39-41d8-bc47-362beb6c7f84"
+    },
+    "runtime": {
+      "entrypoint": "",
+      "timeout": 60
+    }
+  },
+  "description": null,
+  "input_schema": {
+    "properties": {
+      "query": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "language": "python",
+  "name": "ilac_stok_analitik",
+  "output_schema": {
+    "properties": {
+      "results": {
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "source_code": "def execute(input: dict) -> dict:\n    query = input.get(\"query\", \"\")\n    # Implement your tool logic here\n    return {\n        \"results\": [\n            {\"title\": \"Example result\", \"url\": \"https://example.com\", \"snippet\": \"...\"}\n        ]\n    }",
+  "tool_type": "code"
+}

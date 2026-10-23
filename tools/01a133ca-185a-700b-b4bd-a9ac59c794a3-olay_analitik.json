@@ -1,0 +1,68 @@
+{
+  "api_config": {
+    "dataset": {
+      "dataset_id": "6f557119-e9d6-4d54-97c0-20865e32ffef"
+    },
+    "runtime": {
+      "entrypoint": "execute",
+      "requirements": [
+        "pandas"
+      ],
+      "timeout": 60
+    }
+  },
+  "description": "Analyzes the bound dataset with pandas: filter (pandas query syntax), column selection, group-by aggregations, sorting and a row limit. Reads the platform's dataset copy, not the live source.",
+  "input_schema": {
+    "properties": {
+      "aggregations": {
+        "description": "Column -> aggregate function map used with group_by, e.g. {\"price\": \"mean\"}.",
+        "type": "object"
+      },
+      "columns": {
+        "description": "Optional column projection.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "filter": {
+        "description": "Optional pandas query expression, e.g. price > 100 and country == 'TR'.",
+        "type": "string"
+      },
+      "group_by": {
+        "description": "Optional group-by columns.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "limit": {
+        "description": "Max rows to return (capped).",
+        "type": "integer"
+      },
+      "sort_by": {
+        "type": "string"
+      },
+      "sort_dir": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "language": "python",
+  "name": "olay_analitik",
+  "output_schema": {
+    "properties": {
+      "results": {
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "source_code": "def execute(event):\n    d = (event or {}).get(\"_dataset\") or {}\n    dataset_id = str(d.get(\"dataset_id\") or \"\")\n    if not dataset_id:\n        return {\n            \"error\": (\n                \"No dataset is bound to this tool. Wire a dataset node to \"\n                \"the agent in the flow, or bind a dataset in the tool's \"\n                \"properties, then try again.\"\n            )\n        }\n    try:\n        import pandas as pd\n    except Exception:\n        return {\n            \"error\": (\n                \"pandas is unavailable in this runtime. Ask the operator \"\n                \"to include it in the tool runtime image.\"\n            )\n        }\n    rows = []\n    page = 1\n    while len(rows) < 5000:\n        resp = howlet.request(\n            \"GET\",\n            \"/api/v1/data-hub/datasets/\" + dataset_id + \"/rows\",\n            params={\"page\": page, \"page_size\": 500},\n        )\n        items = (((resp or {}).get(\"data\") or {}).get(\"items\")) or []\n        rows.extend(\n            r.get(\"content\", r) if isinstance(r, dict) else r for r in items\n        )\n        if len(items) < 500:\n            break\n        page += 1\n    df = pd.DataFrame(rows)\n    if df.empty:\n        return {\"columns\": [], \"rows\": [], \"row_count\": 0, \"source_rows\": 0}\n    source_rows = int(len(df))\n    flt = str((event or {}).get(\"filter\") or \"\").strip()\n    if flt:\n        try:\n            df = df.query(flt)\n        except Exception as exc:\n            return {\n                \"error\": \"filter could not be applied: %s\" % exc,\n                \"hint\": (\n                    \"use pandas query syntax, e.g. \"\n                    \"price > 100 and country == 'TR'\"\n                ),\n            }\n    cols = [c for c in ((event or {}).get(\"columns\") or []) if c in df.columns]\n    if cols:\n        df = df[cols]\n    group_by = [\n        g for g in ((event or {}).get(\"group_by\") or []) if g in df.columns\n    ]\n    aggs = (event or {}).get(\"aggregations\") or {}\n    if group_by and aggs:\n        try:\n            df = df.groupby(group_by, dropna=False).agg(aggs).reset_index()\n            df.columns = [\n                \"_\".join(str(p) for p in c if str(p)) if isinstance(c, tuple)\n                else str(c)\n                for c in df.columns\n            ]\n        except Exception as exc:\n            return {\n                \"error\": \"aggregation failed: %s\" % exc,\n                \"hint\": (\n                    \"aggregations maps column -> function, e.g. \"\n                    '{\"price\": \"mean\", \"id\": \"count\"}'\n                ),\n            }\n    sort_by = str((event or {}).get(\"sort_by\") or \"\").strip()\n    if sort_by and sort_by in df.columns:\n        df = df.sort_values(\n            sort_by,\n            ascending=str((event or {}).get(\"sort_dir\") or \"asc\") != \"desc\",\n        )\n    limit = int((event or {}).get(\"limit\") or 50)\n    limit = max(1, min(limit, 200))\n    out = df.head(limit)\n    return {\n        \"columns\": [str(c) for c in out.columns],\n        \"rows\": out.to_dict(orient=\"records\"),\n        \"row_count\": int(len(df)),\n        \"returned_rows\": int(len(out)),\n        \"source_rows\": source_rows,\n    }\n",
+  "tool_type": "code"
+}
